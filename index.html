@@ -89,6 +89,17 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
 .hs td.v span{font-family:Arial,Helvetica,sans-serif;font-weight:700;font-size:calc(var(--u)*14.667)}
 .hs td.vs span{font-size:calc(var(--u)*13.333)}
 .hs td.mk span{border:max(.6px,calc(var(--u)*1.8)) solid #000;border-radius:50%;padding:0 calc(var(--u)*4);font-weight:700}
+.bdg[hidden]{display:none!important}
+.bdg{display:inline-block;min-width:18px;padding:0 5px;border-radius:9px;background:#fff;color:var(--acc);font-size:11px;font-weight:700;margin-left:5px;text-align:center}
+nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
+.dayh{display:flex;gap:8px;align-items:center;margin:14px 0 2px;padding-bottom:4px;border-bottom:2px solid var(--line);font-weight:700}
+.row2{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px solid var(--line)}
+.row2:last-child{border-bottom:0}
+.tag.e{background:var(--err-bg);color:var(--err)}
+.tag.g{background:var(--line);color:var(--ink2)}
+.ctl{display:grid;grid-template-columns:1fr auto;gap:6px;border:1px dashed var(--line);border-radius:10px;padding:9px;margin-bottom:8px}
+.ctl .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+.clickable{cursor:pointer}.clickable:hover{background:var(--acc-2)}
 #printArea{display:none}
 @media print{
   @page{size:A4 portrait;margin:0}
@@ -114,9 +125,13 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
   </div>
   <nav class="tabs" role="tablist">
     <button role="tab" data-v="atenciones" aria-selected="true">Atenciones</button>
+    <button role="tab" data-v="historial">Historial</button>
     <button role="tab" data-v="pacientes">Pacientes</button>
-    <button role="tab" data-v="catalogo">Códigos y reglas</button>
+    <button role="tab" data-v="seguimiento">Seguimiento<span class="bdg" id="bdgCtl" hidden></span></button>
     <button role="tab" data-v="imprimir">Imprimir HIS</button>
+    <button role="tab" data-v="entregas">HIS entregados<span class="bdg" id="bdgHis" hidden></span></button>
+    <button role="tab" data-v="catalogo">Códigos y reglas</button>
+    <button role="tab" data-v="paquetes">Paquetes</button>
     <button role="tab" data-v="ajustes">Ajustes</button>
   </nav>
 </header>
@@ -127,6 +142,8 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
   <section class="view on" id="v-atenciones">
     <div class="card">
       <div class="bar"><h2 class="grow" id="attTitle">Atenciones</h2><button class="btn pri" id="btnNew">+ Nueva atención</button></div>
+      <div id="attAlerts"></div>
+      <input class="in" id="attFilter" placeholder="Filtrar este día por DNI o nombre" autocomplete="off">
       <div id="attList"></div>
     </div>
   </section>
@@ -154,6 +171,7 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
     <div class="card">
       <div class="bar"><h2 class="grow" id="prTitle">HIS del día</h2><button class="btn" id="btnPrint">Imprimir</button><button class="btn pri" id="btnPdf">Descargar PDF</button></div>
       <div id="pdfShare" hidden class="msg ok" style="margin-top:10px">PDF descargado. <button class="btn sm" id="btnShare">Compartir / imprimir PDF</button></div>
+      <div id="prStatus" style="margin-top:10px"></div>
       <p class="muted" id="prInfo"></p>
       <div id="prMsgs" class="msgs"></div>
       <div id="preview"></div>
@@ -161,6 +179,55 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
     <div class="card">
       <div class="bar"><h2 class="grow" id="prodTitle">Producción del mes</h2></div>
       <div id="prod"></div>
+    </div>
+  </section>
+
+  <!-- HISTORIAL -->
+  <section class="view" id="v-historial">
+    <div class="card">
+      <h2>Historial de atenciones</h2>
+      <div class="grid">
+        <label class="f">Buscar<input id="hQ" placeholder="DNI, nombre o código" autocomplete="off"></label>
+        <label class="f">Desde<input id="hFrom" type="date"></label>
+        <label class="f">Hasta<input id="hTo" type="date"></label>
+        <label class="f">Grupo de edad<select id="hGrp"></select></label>
+      </div>
+      <div class="bar" style="margin-top:10px">
+        <span class="muted">Rango:</span>
+        <div class="chips"><button class="chip" data-hr="mes">Este mes</button><button class="chip" data-hr="3m">Últimos 3 meses</button><button class="chip" data-hr="anio">Este año</button><button class="chip" data-hr="todo">Todo</button></div>
+      </div>
+      <div id="hSum" style="margin-top:12px"></div>
+      <div id="hList"></div>
+    </div>
+  </section>
+
+  <!-- SEGUIMIENTO -->
+  <section class="view" id="v-seguimiento">
+    <div class="card">
+      <h2>Seguimiento de controles</h2>
+      <p class="muted" style="margin-top:0">Los controles se crean al registrar una atención (según el código, o a mano) y avisan desde la fecha que tú indiques. Se marcan como hechos solos cuando el paciente vuelve y se le registra el mismo código.</p>
+      <div class="chips" id="cTabs"><button class="chip" data-ct="aviso" aria-pressed="true">Avisos activos</button><button class="chip" data-ct="prox" aria-pressed="false">Próximos</button><button class="chip" data-ct="hecho" aria-pressed="false">Hechos y descartados</button></div>
+      <input class="in" id="cQ" placeholder="Filtrar por DNI o nombre" style="margin-top:10px" autocomplete="off">
+      <div id="cList" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- ENTREGAS -->
+  <section class="view" id="v-entregas">
+    <div class="card">
+      <h2>HIS impresos y entregados</h2>
+      <p class="muted" style="margin-top:0">Un día queda <b>impreso</b> al descargar el PDF o imprimir, y <b>entregado</b> cuando lo marcas. Toca un día pendiente para abrir su HIS.</p>
+      <div class="chips" id="eTabs"><button class="chip" data-et="pend" aria-pressed="true">Pendientes</button><button class="chip" data-et="todo" aria-pressed="false">Todos</button></div>
+      <div id="eList" style="margin-top:6px"></div>
+    </div>
+  </section>
+
+  <!-- PAQUETES -->
+  <section class="view" id="v-paquetes">
+    <div class="card">
+      <div class="bar"><h2 class="grow">Paquetes</h2><button class="btn pri" id="btnNewPack">+ Nuevo paquete</button></div>
+      <p class="muted" style="margin-top:0">Un paquete agrega varios códigos de un toque en la atención. Las reglas de cada código se siguen validando igual al guardar. Los marcados como <span class="tag w">propuesta</span> son ejemplos: edítalos o bórralos.</p>
+      <div id="pkList"></div>
     </div>
   </section>
 
@@ -200,6 +267,7 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
 <dialog id="dlgVisit">
   <div class="dh"><strong id="dvTitle">Nueva atención</strong><button class="btn sm" data-close>Cerrar</button></div>
   <div class="db">
+    <div id="dvWarn"></div>
     <h3 style="margin-top:0">Paciente</h3>
     <div id="dvPatPick">
       <input class="in" id="dvPatSearch" placeholder="DNI o nombre del paciente" autocomplete="off">
@@ -208,10 +276,15 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
     <div id="dvPatInfo"></div>
 
     <h3>Diagnósticos y procedimientos</h3>
+    <div class="chips" id="dvPacks" style="margin-bottom:8px"></div>
     <div class="chips" id="dvFavs"></div>
     <input class="in" id="dvCodeSearch" placeholder="Buscar código o descripción" autocomplete="off" style="margin-top:8px">
     <div id="dvCodeSugg"></div>
     <div id="dvItems" style="margin-top:8px"></div>
+
+    <h3>Seguimiento</h3>
+    <div id="dvCtls"></div>
+    <button class="btn sm" id="dvAddCtl">+ Agregar control</button>
 
     <details id="dvOpt"><summary class="muted" style="cursor:pointer;margin:8px 0">Antropometría, hemoglobina y FUR (opcional)</summary>
       <div class="grid">
@@ -278,13 +351,62 @@ dialog .df{position:sticky;bottom:0;background:var(--paper);border-top:1px solid
       <label class="f">Solo para sexo<select id="c_sexo"><option value="">Ambos</option><option value="M">Masculino</option><option value="F">Femenino</option></select></label>
       <label class="f" style="grid-column:span 2">Exige en la misma atención<input id="c_req" placeholder="ej. K02 (cualquier K02x), separa con comas"></label>
       <label class="f">¿Acceso rápido?<select id="c_fav"><option value="1">Sí</option><option value="">No</option></select></label>
+      <label class="f">Control sugerido cada (meses)<input id="c_ctl" inputmode="numeric" placeholder="vacío = sin control"></label>
+      <label class="f">Avisar (días antes)<input id="c_ctlAv" inputmode="numeric" placeholder="ej. 15"></label>
     </div>
+    <p class="muted">El control es solo una sugerencia: en cada atención puedes cambiar la fecha o quitarlo.</p>
     <div class="msgs" id="dcMsgs"></div>
   </div>
   <div class="df">
     <button class="btn dan" id="dcDelete" hidden>Eliminar</button><span class="grow"></span>
     <button class="btn" data-close>Cancelar</button>
     <button class="btn pri" id="dcSave">Guardar código</button>
+  </div>
+</dialog>
+
+<!-- Dialog historial paciente -->
+<dialog id="dlgHist">
+  <div class="dh"><strong>Historial del paciente</strong><button class="btn sm" data-close>Cerrar</button></div>
+  <div class="db" id="dhBody"></div>
+</dialog>
+
+<!-- Dialog paquete -->
+<dialog id="dlgPack">
+  <div class="dh"><strong id="dkTitle">Paquete</strong><button class="btn sm" data-close>Cerrar</button></div>
+  <div class="db">
+    <label class="f">Nombre del paquete<input id="k_name" placeholder="ej. Preventivo niño"></label>
+    <h3>Códigos del paquete</h3>
+    <div id="k_items"></div>
+    <input class="in" id="k_search" placeholder="Agregar código del catálogo" autocomplete="off">
+    <div id="k_sugg"></div>
+    <div class="msgs" id="dkMsgs"></div>
+  </div>
+  <div class="df">
+    <button class="btn dan" id="dkDelete" hidden>Eliminar</button><span class="grow"></span>
+    <button class="btn" data-close>Cancelar</button>
+    <button class="btn pri" id="dkSave">Guardar paquete</button>
+  </div>
+</dialog>
+
+<!-- Dialog control -->
+<dialog id="dlgCtl">
+  <div class="dh"><strong>Control</strong><button class="btn sm" data-close>Cerrar</button></div>
+  <div class="db">
+    <p id="t_pat" style="margin-top:0"></p>
+    <div class="grid">
+      <label class="f" style="grid-column:span 2">Motivo<input id="t_mot"></label>
+      <label class="f">Código que lo cierra<input id="t_code" style="text-transform:uppercase" placeholder="vacío = cualquier atención"></label>
+      <label class="f">Fecha del control<input id="t_due" type="date"></label>
+      <label class="f">Avisar desde<input id="t_not" type="date"></label>
+      <label class="f">Estado<select id="t_st"><option value="pend">Pendiente</option><option value="hecho">Hecho</option><option value="desc">Descartado</option></select></label>
+      <label class="f" style="grid-column:span 2">Nota<input id="t_nota"></label>
+    </div>
+    <div class="msgs" id="dtMsgs"></div>
+  </div>
+  <div class="df">
+    <button class="btn dan" id="dtDelete">Eliminar</button><span class="grow"></span>
+    <button class="btn" data-close>Cancelar</button>
+    <button class="btn pri" id="dtSave">Guardar</button>
   </div>
 </dialog>
 
@@ -723,13 +845,24 @@ const SEED_CODES=[
  ['K020','CIE','Caries de esmalte','',''],['K041','CIE','Necrosis pulpar','',''],['D1330','CPT','IHO','D','1'],
  ['D1310','CPT','ANCED','D','1'],['D1110','CPT','Profilaxis dental','D','1'],['D1206','CPT','Fluorización barniz','D','1'],
  ['D1351','CPT','Sellantes','D','1'],['D2330','CPT','Restauración con resina','D','1'],['D7140','CPT','Exodoncia simple','D','1']
-].map(([code,kind,desc,tipo,lab])=>({code,kind,desc,tipo,lab,min:'',max:'',sexo:'',req:code==='D2330'?['K02']:[],fav:true,ej:true}));
+].map(([code,kind,desc,tipo,lab])=>({code,kind,desc,tipo,lab,min:'',max:'',sexo:'',req:code==='D2330'?['K02']:[],fav:true,ej:true,ctl:code==='D1206'?'6':'',ctlAv:code==='D1206'?'15':''}));
+const SEED_PACKS=[
+ {id:'pk1',name:'Preventivo niño',ej:true,items:['D0150','D1330','D1310','D1110','D1206','D1351'].map(code=>({code,tipo:'',lab:''}))},
+ {id:'pk2',name:'Caries + resina',ej:true,items:['K021','D2330'].map(code=>({code,tipo:'',lab:''}))}
+];
+const GRUPOS=[['n1','Niño 0–6 años',0,6],['n2','Niño 7–11 años',7,11],['ad','Adolescente 12–17',12,17],['jo','Adulto joven 18–29',18,29],['adu','Adulto 30–59',30,59],['am','Adulto mayor 60+',60,999]];
+function migrate(){
+  S.packs=S.packs||JSON.parse(JSON.stringify(SEED_PACKS));
+  S.controls=S.controls||[]; S.his=S.his||{};
+  S.codes.forEach(c=>{ if(c.ctl===undefined){ c.ctl=(c.ej&&c.code==='D1206')?'6':''; c.ctlAv=(c.ej&&c.code==='D1206')?'15':''; } });
+}
 
 let S;           // estado
 let memOnly=false;
 function load(){
   let raw=null; try{raw=localStorage.getItem(KEY)}catch(e){memOnly=true}
   S=raw?JSON.parse(raw):{settings:{eess:'CENTRO DE SALUD YORONGOS',upss:'ODONTOLOGÍA',resp:'',dni:'',fin:2,etnia:'58',dist:'YORONGOS',cp:''},patients:[],codes:SEED_CODES,visits:[],lastBackup:null};
+  migrate();
 }
 function save(){ try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true;showStoreWarn()} }
 function showStoreWarn(){ if(memOnly) $('#storeWarn').innerHTML='<div class="msg e" style="margin-bottom:12px">Este navegador no permite guardar datos: lo que registres se perderá al cerrar. Abre el archivo en Chrome o Edge.</div>'; }
@@ -811,6 +944,7 @@ function finOpts(sel){ return Object.entries(FIN).map(([k,v])=>'<option value="'
 function render(){
   $('#hdrEess').textContent=S.settings.eess?' · '+S.settings.eess:'';
   renderAtt(); renderPats(); renderCodes(); renderPrint(); renderSettings(); showStoreWarn();
+  renderHist(); renderCtls(); renderEnt(); renderPacks(); renderBadges(); renderBackupBanner();
 }
 const visitsOf=d=>S.visits.filter(v=>v.date===d).sort((a,b)=>a.created-b.created);
 
@@ -818,14 +952,21 @@ function renderAtt(){
   const d=wd(), vs=visitsOf(d);
   const rows=vs.reduce((n,v)=>n+Math.max(1,Math.ceil(v.items.length/3)),0);
   $('#attTitle').textContent='Atenciones del '+fmtD(d)+(vs.length?' ('+vs.length+')':'');
+  const nAl=activeCtls().length;
+  $('#attAlerts').innerHTML=nAl?'<div class="msg w" style="margin-bottom:10px">'+nAl+' paciente(s) tienen control pendiente. <button class="btn sm" id="goCtl">Ver seguimiento</button></div>':'';
+  if(nAl) $('#goCtl').onclick=()=>setView('seguimiento');
+  $('#attFilter').hidden=!vs.length;
   if(!vs.length){ $('#attList').innerHTML='<div class="empty">Aún no hay atenciones este día.<br>Toca <b>+ Nueva atención</b> para registrar la primera.</div>'; return; }
+  const fq=normQ($('#attFilter').value);
   let n=0;
-  $('#attList').innerHTML=vs.map(v=>{
+  const html=vs.map(v=>{
     const p=pat(v.patientId)||{}, a=age(p.fnac,v.date), val=validate(v); n++;
+    if(fq && !(p.dni||'').includes(fq) && !normQ(p.nom).includes(fq)) return '';
     const bad=val.E.length?'<span class="tag w">'+val.E.length+' error(es)</span>':'';
     return '<div class="visit"><div class="n">'+n+'</div><div><b>'+esc(p.nom||'¿?')+'</b>'+bad+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · '+(p.sexo||'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div><div class="codes">'+v.items.map(i=>esc(i.code)+' '+i.tipo).join(' · ')+'</div></div><button class="btn sm" data-edit="'+v.id+'">Editar</button></div>';
-  }).join('')+'<p class="muted" style="margin:10px 0 0">Ocupan '+rows+' de 25 filas por juego de HIS (anverso + reverso).</p>';
-  $$('[data-edit]').forEach(b=>b.onclick=()=>openVisit(b.dataset.edit));
+  }).join('');
+  $('#attList').innerHTML=(html||'<div class="empty">Ninguna atención de este día coincide con “'+esc($('#attFilter').value)+'”.</div>')+'<p class="muted" style="margin:10px 0 0">Ocupan '+rows+' de 25 filas por juego de HIS (anverso + reverso).</p>';
+  $$('#attList [data-edit]').forEach(b=>b.onclick=()=>openVisit(b.dataset.edit));
 }
 
 /* ---------- Atención ---------- */
@@ -840,6 +981,10 @@ function openVisit(id){
   $('#dvFHb').value=V.fhb||''; $('#dvFur').value=V.fur||'';
   $('#dvOpt').open=!!(V.peso||V.talla||V.hb||V.fur);
   $('#dvPatSearch').value=''; $('#dvPatSugg').innerHTML=''; $('#dvCodeSearch').value=''; $('#dvCodeSugg').innerHTML='';
+  V._ctls=S.controls.filter(c=>c.fromVisitId===V.id).map(c=>({...c}));
+  const h=S.his[V.date];
+  $('#dvWarn').innerHTML=h&&h.delivered?'<div class="msg w" style="margin-bottom:10px">El HIS de este día ya se entregó el '+fmtD(h.delivered)+'. Si cambias algo, el papel entregado ya no coincidirá.</div>':
+    h&&h.printed?'<div class="msg w" style="margin-bottom:10px">El HIS de este día ya se imprimió. Si cambias algo, tendrás que volver a imprimirlo.</div>':'';
   drawVisit(); $('#dlgVisit').showModal();
   if(!V.patientId) setTimeout(()=>$('#dvPatSearch').focus(),50);
 }
@@ -858,6 +1003,10 @@ function drawVisit(){
     $('#dvPatEdit').onclick=()=>openPat(p.id,true);
     $('#dvPatChange').onclick=()=>{V.patientId=null;drawVisit();$('#dvPatSearch').focus()};
   } else $('#dvPatInfo').innerHTML='';
+  // paquetes
+  $('#dvPacks').innerHTML=S.packs.length?'<span class="muted" style="align-self:center">Paquetes:</span>'+S.packs.map(k=>{const all=k.items.length&&k.items.every(i=>V.items.some(x=>x.code===i.code));return '<button class="chip" data-pk="'+k.id+'" aria-pressed="'+all+'">▦ '+esc(k.name)+'</button>'}).join(''):'';
+  $$('#dvPacks [data-pk]').forEach(b=>b.onclick=()=>applyPack(b.dataset.pk));
+  drawCtls();
   // favoritos
   $('#dvFavs').innerHTML=S.codes.filter(c=>c.fav).map(c=>'<button class="chip" data-add="'+esc(c.code)+'" aria-pressed="'+V.items.some(i=>i.code===c.code)+'">'+esc(c.desc)+'</button>').join('');
   $$('#dvFavs [data-add]').forEach(b=>b.onclick=()=>toggleItem(b.dataset.add));
@@ -868,7 +1017,7 @@ function drawVisit(){
       '<div class="bar"><span class="muted">Tipo</span><div class="chips">'+['P','D','R'].map(t=>'<button class="chip" data-t="'+ix+t+'" aria-pressed="'+(it.tipo===t)+'"'+(cpt&&t!=='D'?' disabled style="opacity:.4"':'')+'>'+t+'</button>').join('')+'</div>'+
       '<div class="labs"><span class="muted">LAB</span>'+[0,1,2].map(k=>'<input class="in" data-lab="'+ix+'-'+k+'" value="'+esc(it.lab[k]||'')+'" aria-label="LAB '+(k+1)+'">').join('')+'</div></div></div>';
   }).join('');
-  $$('[data-rm]').forEach(b=>b.onclick=()=>{V.items.splice(+b.dataset.rm,1);drawVisit()});
+  $$('#dvItems [data-rm]').forEach(b=>b.onclick=()=>{const it=V.items.splice(+b.dataset.rm,1)[0];dropCtlFor(it.code);drawVisit()});
   $$('[data-up]').forEach(b=>b.onclick=()=>{const i=+b.dataset.up;[V.items[i-1],V.items[i]]=[V.items[i],V.items[i-1]];drawVisit()});
   $$('[data-t]').forEach(b=>b.onclick=()=>{V.items[+b.dataset.t.slice(0,-1)].tipo=b.dataset.t.slice(-1);drawVisit()});
   $$('[data-lab]').forEach(inp=>inp.oninput=()=>{const [i,k]=inp.dataset.lab.split('-');V.items[i].lab[k]=inp.value.trim();refreshMsgs()});
@@ -877,12 +1026,47 @@ function drawVisit(){
 function readOpt(){ V.peso=$('#dvPeso').value.trim();V.talla=$('#dvTalla').value.trim();V.hb=$('#dvHb').value.trim();V.fhb=$('#dvFHb').value;V.fur=$('#dvFur').value; }
 function refreshMsgs(){ readOpt(); $('#dvMsgs').innerHTML=msgsHTML(validate(V),'Todo en orden.'); }
 ['#dvPeso','#dvTalla','#dvHb','#dvFHb','#dvFur'].forEach(s=>$(s).oninput=refreshMsgs);
+function addItem(code,tipo,lab){
+  if(V.items.some(i=>i.code===code)) return;
+  const c=codeOf(code); const cpt=c&&c.kind==='CPT';
+  V.items.push({code,desc:c?c.desc:code,tipo:cpt?'D':(tipo||suggestTipo(V,code)),lab:[lab||(c&&c.lab)||'','','']});
+  proposeCtl(code);
+}
 function toggleItem(code){
   const k=V.items.findIndex(i=>i.code===code);
-  if(k>=0) V.items.splice(k,1);
-  else { const c=codeOf(code); V.items.push({code,desc:c?c.desc:code,tipo:suggestTipo(V,code),lab:[c&&c.lab||'','','']}); }
+  if(k>=0){ V.items.splice(k,1); dropCtlFor(code); }
+  else addItem(code);
   drawVisit();
 }
+function applyPack(id){
+  const k=S.packs.find(x=>x.id===id); if(!k) return;
+  const all=k.items.every(i=>V.items.some(x=>x.code===i.code));
+  if(all){ k.items.forEach(i=>{const ix=V.items.findIndex(x=>x.code===i.code); if(ix>=0){V.items.splice(ix,1); dropCtlFor(i.code);} }); }
+  else k.items.forEach(i=>addItem(i.code,i.tipo,i.lab));
+  drawVisit();
+}
+/* seguimiento dentro de la atención */
+function addDays(iso,n){ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function addMonths(iso,n){ const d=new Date(iso+'T12:00'), day=d.getDate(); d.setMonth(d.getMonth()+n); if(d.getDate()<day) d.setDate(0); return d.toISOString().slice(0,10); }
+function proposeCtl(code){
+  const c=codeOf(code); if(!c||!(+c.ctl>0)) return;
+  if(V._ctls.some(x=>x.code===code && x.status==='pend')) return;
+  const due=addMonths(V.date,+c.ctl);
+  V._ctls.push({id:uid(),patientId:V.patientId,fromVisitId:V.id,code,motivo:'Control de '+c.desc,due,notify:addDays(due,-(+c.ctlAv||0)),nota:'',status:'pend',auto:true});
+}
+function dropCtlFor(code){ V._ctls=V._ctls.filter(x=>!(x.code===code && x.status==='pend' && x.auto)); }
+function drawCtls(){
+  const box=$('#dvCtls');
+  if(!V._ctls.length){ box.innerHTML='<p class="muted" style="margin:0 0 8px">Sin controles. Se sugieren solos con los códigos que tienen control configurado, o agrégalo a mano.</p>'; return; }
+  box.innerHTML=V._ctls.map((x,i)=>'<div class="ctl"><div><div class="bar" style="margin-bottom:6px"><b>'+esc(x.motivo)+'</b>'+(x.code?'<span class="tag">'+esc(x.code)+'</span>':'')+(x.status!=='pend'?'<span class="tag g">'+(x.status==='hecho'?'hecho':'descartado')+'</span>':'')+'</div>'+
+    '<div class="grid"><label class="f">Motivo<input data-cm="'+i+'" value="'+esc(x.motivo)+'"></label><label class="f">Fecha del control<input type="date" data-cd="'+i+'" value="'+x.due+'"></label><label class="f">Avisar desde<input type="date" data-cn="'+i+'" value="'+x.notify+'"></label></div></div>'+
+    '<button class="btn sm dan" data-cx="'+i+'" style="align-self:start">Quitar</button></div>').join('');
+  $$('#dvCtls [data-cm]').forEach(e=>e.oninput=()=>{V._ctls[+e.dataset.cm].motivo=e.value});
+  $$('#dvCtls [data-cd]').forEach(e=>e.onchange=()=>{const x=V._ctls[+e.dataset.cd]; const gap=x.due&&x.notify?(new Date(x.due)-new Date(x.notify))/864e5:0; x.due=e.value; if(e.value) x.notify=addDays(e.value,-gap); drawCtls();});
+  $$('#dvCtls [data-cn]').forEach(e=>e.onchange=()=>{V._ctls[+e.dataset.cn].notify=e.value});
+  $$('#dvCtls [data-cx]').forEach(e=>e.onclick=()=>{V._ctls.splice(+e.dataset.cx,1);drawCtls()});
+}
+$('#dvAddCtl').onclick=()=>{ const due=addMonths(V.date,6); V._ctls.push({id:uid(),patientId:V.patientId,fromVisitId:V.id,code:'',motivo:'Control',due,notify:addDays(due,-15),nota:'',status:'pend'}); drawCtls(); };
 $('#dvCodeSearch').oninput=e=>{
   const q=e.target.value.trim().toUpperCase(); if(!q){$('#dvCodeSugg').innerHTML='';return}
   const qs=q.normalize('NFD').replace(/[\u0300-\u036f]/g,'');
@@ -902,10 +1086,27 @@ $('#dvPatSearch').oninput=e=>{
 $('#dvSave').onclick=()=>{
   readOpt(); const val=validate(V);
   if(val.E.length){ $('#dvMsgs').innerHTML=msgsHTML(val); $('#dvMsgs').scrollIntoView({behavior:'smooth',block:'center'}); return; }
+  const E2=V._ctls.filter(x=>x.status==='pend'&&(!x.due||!x.notify||x.notify>x.due)).length;
+  if(E2){ $('#dvMsgs').innerHTML='<div class="msg e">Revisa las fechas de seguimiento: cada control necesita fecha, y el aviso no puede ser después del control.</div>'; return; }
+  const ctls=V._ctls; delete V._ctls; V.updated=Date.now();
   const k=S.visits.findIndex(v=>v.id===V.id); if(k>=0) S.visits[k]=V; else S.visits.push(V);
+  // controles propios de esta atención
+  S.controls=S.controls.filter(c=>c.fromVisitId!==V.id).concat(ctls.map(c=>({...c,patientId:V.patientId})));
+  // cierra controles pendientes de atenciones anteriores del mismo paciente
+  const codes=V.items.map(i=>i.code);
+  S.controls.forEach(c=>{
+    if(c.status!=='pend'||c.patientId!==V.patientId||c.fromVisitId===V.id) return;
+    const from=S.visits.find(v=>v.id===c.fromVisitId);
+    if(from && from.date>=V.date) return;
+    if(!c.code || codes.includes(c.code)){ c.status='hecho'; c.doneDate=V.date; c.doneVisitId=V.id; }
+  });
   save(); $('#dlgVisit').close(); render();
 };
-$('#dvDelete').onclick=()=>{ if(confirm('¿Eliminar esta atención?')){ S.visits=S.visits.filter(v=>v.id!==V.id); save(); $('#dlgVisit').close(); render(); } };
+$('#dvDelete').onclick=()=>{ if(confirm('¿Eliminar esta atención? También se quitan sus controles de seguimiento.')){
+  S.visits=S.visits.filter(v=>v.id!==V.id);
+  S.controls=S.controls.filter(c=>c.fromVisitId!==V.id);
+  S.controls.forEach(c=>{ if(c.doneVisitId===V.id){ c.status='pend'; delete c.doneVisitId; delete c.doneDate; } });
+  save(); $('#dlgVisit').close(); render(); } };
 
 /* ---------- Pacientes ---------- */
 let P=null, patFromVisit=false;
@@ -950,8 +1151,9 @@ function renderPats(){
   const q=($('#patSearch').value||'').trim().toUpperCase();
   const list=S.patients.filter(p=>!q||(p.dni||'').includes(q)||(p.nom||'').includes(q)).sort((a,b)=>a.nom.localeCompare(b.nom));
   if(!S.patients.length){ $('#patList').innerHTML='<div class="empty">El padrón está vacío. Los pacientes se agregan aquí o al registrar una atención.</div>'; return; }
-  $('#patList').innerHTML='<table class="list"><tr><th>Paciente</th><th>DNI</th><th>Nac.</th><th>Atenc.</th><th></th></tr>'+list.slice(0,200).map(p=>'<tr><td>'+esc(p.nom)+'</td><td>'+esc(p.dni)+'</td><td>'+fmtD(p.fnac)+'</td><td>'+S.visits.filter(v=>v.patientId===p.id).length+'</td><td><button class="btn sm" data-ep="'+p.id+'">Editar</button></td></tr>').join('')+'</table>';
-  $$('[data-ep]').forEach(b=>b.onclick=()=>openPat(b.dataset.ep,false));
+  $('#patList').innerHTML='<table class="list"><tr><th>Paciente</th><th>DNI</th><th>Nac.</th><th>Atenc.</th><th></th></tr>'+list.slice(0,200).map(p=>'<tr><td>'+esc(p.nom)+'</td><td>'+esc(p.dni)+'</td><td>'+fmtD(p.fnac)+'</td><td>'+S.visits.filter(v=>v.patientId===p.id).length+'</td><td style="white-space:nowrap"><button class="btn sm" data-hp="'+p.id+'">Ver historial</button> <button class="btn sm" data-ep="'+p.id+'">Editar</button></td></tr>').join('')+'</table>';
+  $$('#patList [data-ep]').forEach(b=>b.onclick=()=>openPat(b.dataset.ep,false));
+  $$('#patList [data-hp]').forEach(b=>b.onclick=()=>openHist(b.dataset.hp));
 }
 
 /* ---------- Catálogo ---------- */
@@ -961,24 +1163,25 @@ function openCode(code){
   const ex=code&&codeOf(code);
   C=ex?{...ex,_orig:ex.code}:{code:'',kind:'CIE',desc:'',tipo:'',lab:'',min:'',max:'',sexo:'',req:[],fav:true};
   $('#c_code').value=C.code;$('#c_kind').value=C.kind;$('#c_desc').value=C.desc;$('#c_tipo').value=C.tipo;$('#c_lab').value=C.lab;
-  $('#c_min').value=C.min;$('#c_max').value=C.max;$('#c_sexo').value=C.sexo;$('#c_req').value=(C.req||[]).join(', ');$('#c_fav').value=C.fav?'1':'';
+  $('#c_min').value=C.min;$('#c_max').value=C.max;$('#c_sexo').value=C.sexo;$('#c_req').value=(C.req||[]).join(', ');$('#c_fav').value=C.fav?'1':''; $('#c_ctl').value=C.ctl||''; $('#c_ctlAv').value=C.ctlAv||'';
   $('#dcDelete').hidden=!ex; $('#dcMsgs').innerHTML=''; $('#dlgCode').showModal();
 }
 $('#dcSave').onclick=()=>{
   const n={code:$('#c_code').value.trim().toUpperCase(),kind:$('#c_kind').value,desc:$('#c_desc').value.trim(),tipo:$('#c_tipo').value,lab:$('#c_lab').value.trim(),
-    min:$('#c_min').value.trim(),max:$('#c_max').value.trim(),sexo:$('#c_sexo').value,req:$('#c_req').value.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean),fav:!!$('#c_fav').value};
+    min:$('#c_min').value.trim(),max:$('#c_max').value.trim(),sexo:$('#c_sexo').value,req:$('#c_req').value.split(',').map(s=>s.trim().toUpperCase()).filter(Boolean),fav:!!$('#c_fav').value,ctl:$('#c_ctl').value.trim(),ctlAv:$('#c_ctlAv').value.trim()};
   if(n.kind==='CPT') n.tipo='D';
   const E=[];
   if(!n.code) E.push('Escribe el código.'); if(!n.desc) E.push('Escribe cómo va en el HIS.');
   if(S.codes.some(x=>x.code===n.code&&x.code!==C._orig)) E.push('Ese código ya existe.');
   if(n.min!==''&&n.max!==''&&+n.min>+n.max) E.push('La edad mínima es mayor que la máxima.');
+  if(n.ctl!==''&&!(+n.ctl>0)) E.push('El control debe ser un número de meses mayor a 0.');
   if(E.length){$('#dcMsgs').innerHTML=msgsHTML({E,W:[]});return}
   const k=S.codes.findIndex(x=>x.code===C._orig); if(k>=0) S.codes[k]=n; else S.codes.push(n);
   save(); $('#dlgCode').close(); render();
 };
 $('#dcDelete').onclick=()=>{ if(confirm('¿Eliminar '+C._orig+'? Las atenciones ya registradas no cambian.')){ S.codes=S.codes.filter(x=>x.code!==C._orig); save(); $('#dlgCode').close(); render(); } };
 function renderCodes(){
-  const rule=c=>[c.kind==='CPT'?'siempre D':(c.tipo?'por defecto '+c.tipo:''),c.min!==''?'desde '+c.min+' a':'',c.max!==''?'hasta '+c.max+' a':'',c.sexo?'solo '+c.sexo:'',(c.req||[]).length?'exige '+c.req.join(', '):'',c.lab?'LAB '+c.lab:''].filter(Boolean).join(' · ');
+  const rule=c=>[c.kind==='CPT'?'siempre D':(c.tipo?'por defecto '+c.tipo:''),c.min!==''?'desde '+c.min+' a':'',c.max!==''?'hasta '+c.max+' a':'',c.sexo?'solo '+c.sexo:'',(c.req||[]).length?'exige '+c.req.join(', '):'',c.lab?'LAB '+c.lab:'',+c.ctl>0?'control cada '+c.ctl+' m':''].filter(Boolean).join(' · ');
   const sorted=[...S.codes].sort((a,b)=>a.kind.localeCompare(b.kind)||a.code.localeCompare(b.code));
   $('#codeList').innerHTML=sorted.length?'<table class="list"><tr><th>Código</th><th>En el HIS</th><th>Reglas</th><th></th></tr>'+sorted.map(c=>'<tr><td><b>'+esc(c.code)+'</b><div class="muted">'+c.kind+'</div></td><td>'+esc(c.desc)+(c.ej?'<span class="tag w">revisar</span>':'')+(c.fav?'<span class="tag">rápido</span>':'')+'</td><td class="muted">'+esc(rule(c))+'</td><td><button class="btn sm" data-ec="'+esc(c.code)+'">Editar</button></td></tr>').join('')+'</table>':'<div class="empty">No hay códigos. Agrega los que usas a diario.</div>';
   $$('[data-ec]').forEach(b=>b.onclick=()=>openCode(b.dataset.ec));
@@ -1037,11 +1240,12 @@ function renderPrint(){
   const pages=buildPages(d); const avail=Math.max(280,box.clientWidth-20);
   pages.forEach(pg=>{ pg.style.setProperty('--u',Math.min(.6,avail/1432)+'px'); box.appendChild(pg); });
   renderProd(d);
+  renderPrStatus(d);
 }
 $('#btnPrint').onclick=()=>{
   const d=wd(), bad=visitsOf(d).filter(v=>validate(v).E.length);
   if(bad.length && !confirm('Hay atenciones con errores. ¿Imprimir de todas formas?')) return;
-  const pa=$('#printArea'); pa.innerHTML=''; buildPages(d).forEach(p=>pa.appendChild(p)); window.print();
+  const pa=$('#printArea'); pa.innerHTML=''; buildPages(d).forEach(p=>pa.appendChild(p)); window.print(); markPrinted(d);
 };
 let lastPdf=null;
 $('#btnPdf').onclick=async()=>{
@@ -1063,6 +1267,7 @@ $('#btnPdf').onclick=async()=>{
     }
     const name='HIS-'+d+'.pdf';
     lastPdf=new File([doc.output('blob')],name,{type:'application/pdf'});
+    markPrinted(d);
     const iOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
     const android=/Android/i.test(navigator.userAgent);
     if(iOS && await sharePdf()) {}           // iPhone/iPad: menú compartir (AirPrint, WhatsApp, Archivos)
@@ -1097,24 +1302,239 @@ $('#btnSaveSet').onclick=()=>{
   Object.assign(S.settings,{eess:u('#s_eess'),upss:u('#s_upss'),resp:u('#s_resp'),dni:$('#s_dni').value.trim(),fin:+$('#s_fin').value,etnia:$('#s_etnia').value.trim(),dist:u('#s_dist'),cp:u('#s_cp')});
   save(); render(); $('#setMsg').textContent='Guardado.'; setTimeout(()=>$('#setMsg').textContent='',2000);
 };
-$('#btnExport').onclick=()=>{
-  S.lastBackup=Date.now(); save();
+$('#btnExport').onclick=()=>doBackup();
+function doBackup(){
+  S.lastBackup=Date.now(); S.bkSnooze=null; save();
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));
-  a.download='his-odonto-copia-'+todayISO()+'.json'; document.body.appendChild(a); a.click(); a.remove(); renderSettings();
-};
+  a.download='his-odonto-copia-'+todayISO()+'.json'; document.body.appendChild(a); a.click(); a.remove(); renderSettings(); renderBackupBanner();
+}
 $('#fileImport').onchange=e=>{
   const f=e.target.files[0]; if(!f) return; const r=new FileReader();
   r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.patients||!d.visits||!d.codes) throw 0;
-    if(confirm('Esto reemplaza todos los datos actuales por los de la copia ('+d.patients.length+' pacientes, '+d.visits.length+' atenciones). ¿Continuar?')){ S=d; save(); render(); } }
+    if(confirm('Esto reemplaza todos los datos actuales por los de la copia ('+d.patients.length+' pacientes, '+d.visits.length+' atenciones). ¿Continuar?')){ S=d; migrate(); save(); render(); } }
     catch(_){ alert('El archivo no es una copia válida de HIS Odonto.'); } e.target.value=''; };
   r.readAsText(f);
 };
 $('#btnWipe').onclick=()=>{ if(confirm('¿Borrar TODOS los pacientes, atenciones y ajustes? Descarga una copia antes.')&&confirm('Confirma de nuevo: esto no se puede deshacer.')){ try{localStorage.removeItem(KEY)}catch(e){} load(); render(); } };
 
+/* ---------- utilidades comunes ---------- */
+const normQ=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
+const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+const dayName=iso=>DIAS[new Date(iso+'T12:00').getDay()];
+function grpOf(p,date){ const a=age(p&&p.fnac,date); if(!a) return null; return GRUPOS.find(g=>a.y>=g[2]&&a.y<=g[3])||null; }
+function goDay(d,view){ $('#workDate').value=d; $$('dialog[open]').forEach(x=>x.close()); setView(view||'atenciones'); }
+const itemsTxt=v=>v.items.map(i=>'<div>'+esc(i.code)+' · '+esc(i.desc)+' <span class="muted">('+(i.tipo||'?')+')</span></div>').join('');
+
+/* ---------- Historial ---------- */
+let histInit=false;
+$('#hGrp').innerHTML='<option value="">Todos</option>'+GRUPOS.map(g=>'<option value="'+g[0]+'">'+g[1]+'</option>').join('');
+function setRange(k){
+  const t=todayISO(), y=t.slice(0,4);
+  if(k==='mes'){ $('#hFrom').value=t.slice(0,8)+'01'; $('#hTo').value=t; }
+  if(k==='3m'){ $('#hFrom').value=addMonths(t,-3); $('#hTo').value=t; }
+  if(k==='anio'){ $('#hFrom').value=y+'-01-01'; $('#hTo').value=t; }
+  if(k==='todo'){ $('#hFrom').value=''; $('#hTo').value=''; }
+  renderHist();
+}
+$$('[data-hr]').forEach(b=>b.onclick=()=>setRange(b.dataset.hr));
+['#hQ','#hFrom','#hTo','#hGrp'].forEach(x=>{$(x).oninput=renderHist; $(x).onchange=renderHist;});
+function renderHist(){
+  if(!$('#v-historial').classList.contains('on')) return;
+  if(!histInit){ histInit=true; const t=todayISO(); $('#hFrom').value=t.slice(0,8)+'01'; $('#hTo').value=t; }
+  const q=normQ($('#hQ').value), f=$('#hFrom').value, t=$('#hTo').value, g=$('#hGrp').value;
+  const base=S.visits.filter(v=>(!f||v.date>=f)&&(!t||v.date<=t)).filter(v=>{
+    if(!q) return true; const p=pat(v.patientId)||{};
+    return (p.dni||'').includes(q)||normQ(p.nom).includes(q)||v.items.some(i=>i.code.includes(q)||normQ(i.desc).includes(q));
+  });
+  const cnt={}; base.forEach(v=>{const gg=grpOf(pat(v.patientId),v.date); const k=gg?gg[0]:'?'; cnt[k]=(cnt[k]||0)+1;});
+  const vs=base.filter(v=>{ if(!g) return true; const gg=grpOf(pat(v.patientId),v.date); return gg&&gg[0]===g; })
+    .sort((a,b)=>b.date.localeCompare(a.date)||a.created-b.created);
+  const npat=new Set(vs.map(v=>v.patientId)).size;
+  $('#hSum').innerHTML='<p style="margin:0 0 6px"><b>'+vs.length+'</b> atenciones · <b>'+npat+'</b> pacientes'+(f||t?' · del '+(f?fmtD(f):'inicio')+' al '+(t?fmtD(t):'hoy'):' · todas las fechas')+'</p>'+
+    '<div class="chips">'+GRUPOS.map(x=>'<button class="chip" data-hg="'+x[0]+'" aria-pressed="'+(g===x[0])+'">'+x[1]+': '+(cnt[x[0]]||0)+'</button>').join('')+'</div>';
+  $$('#hSum [data-hg]').forEach(b=>b.onclick=()=>{ $('#hGrp').value=$('#hGrp').value===b.dataset.hg?'':b.dataset.hg; renderHist(); });
+  if(!vs.length){ $('#hList').innerHTML='<div class="empty">No hay atenciones con esos filtros.</div>'; return; }
+  const MAX=400; let html='', cur=null;
+  vs.slice(0,MAX).forEach(v=>{
+    if(v.date!==cur){ cur=v.date; const n=vs.filter(x=>x.date===cur).length;
+      html+='<div class="dayh"><span class="grow">'+fmtD(cur)+' <span class="muted" style="font-weight:400">'+dayName(cur)+' · '+n+' atención(es)</span></span><button class="btn sm" data-gd="'+cur+'">Ir al día</button></div>'; }
+    const p=pat(v.patientId)||{}, a=age(p.fnac,v.date), gg=grpOf(p,v.date);
+    html+='<div class="row2"><div class="grow"><b>'+esc(p.nom||'¿?')+'</b>'+(gg?'<span class="tag">'+gg[1]+'</span>':'')+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div><div class="codes muted">'+itemsTxt(v)+'</div></div><button class="btn sm" data-hv="'+v.id+'">Editar</button></div>';
+  });
+  if(vs.length>MAX) html+='<p class="muted">Se muestran las '+MAX+' más recientes. Acota el rango de fechas para ver el resto.</p>';
+  $('#hList').innerHTML=html;
+  $$('#hList [data-gd]').forEach(b=>b.onclick=()=>goDay(b.dataset.gd));
+  $$('#hList [data-hv]').forEach(b=>b.onclick=()=>openVisit(b.dataset.hv));
+}
+
+/* ---------- Historial del paciente ---------- */
+let histPid=null;
+function openHist(pid){ histPid=pid; drawHist(); $('#dlgHist').showModal(); }
+function drawHist(){
+  const p=pat(histPid); if(!p) return;
+  const vs=S.visits.filter(v=>v.patientId===p.id).sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+  const a=age(p.fnac,todayISO());
+  const ctl=S.controls.filter(c=>c.patientId===p.id&&c.status==='pend').sort((x,y)=>x.due.localeCompare(y.due));
+  let h='<div class="pinfo"><div class="grow"><b>'+esc(p.nom)+'</b><div class="muted">DNI '+esc(p.dni||'—')+' · HC '+esc(p.hc||p.dni||'—')+' · nac. '+fmtD(p.fnac)+(a?' ('+a.n+' '+{A:'años',M:'meses',D:'días'}[a.u]+')':'')+' · '+(p.sexo==='F'?'Femenino':p.sexo==='M'?'Masculino':'')+'</div></div>'+
+    '<div class="muted"><b style="color:var(--ink)">'+vs.length+'</b> atención(es)'+(vs.length?'<br>primera '+fmtD(vs[vs.length-1].date)+' · última '+fmtD(vs[0].date):'')+'</div></div>';
+  if(ctl.length) h+='<h3>Controles pendientes</h3>'+ctl.map(c=>'<div class="row2"><div class="grow"><b>'+esc(c.motivo)+'</b>'+(c.due<todayISO()?'<span class="tag e">vencido</span>':'')+'<div class="muted">Control '+fmtD(c.due)+' · aviso desde '+fmtD(c.notify)+'</div></div><button class="btn sm" data-ec2="'+c.id+'">Editar</button></div>').join('');
+  h+='<h3>Atenciones</h3>';
+  if(!vs.length) h+='<div class="empty">Este paciente aún no tiene atenciones registradas.</div>';
+  h+=vs.map(v=>{ const av=age(p.fnac,v.date), gg=grpOf(p,v.date);
+    return '<div class="row2"><div style="min-width:92px"><b>'+fmtD(v.date)+'</b><div class="muted">'+dayName(v.date)+'</div></div><div class="grow"><div class="muted">'+(av?av.n+' '+av.u:'')+(gg?' · '+gg[1]:'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div>'+itemsTxt(v)+'</div><div style="display:flex;flex-direction:column;gap:4px"><button class="btn sm" data-gd="'+v.date+'">Ir al día</button><button class="btn sm" data-hv="'+v.id+'">Editar</button></div></div>';
+  }).join('');
+  $('#dhBody').innerHTML=h;
+  $$('#dhBody [data-gd]').forEach(b=>b.onclick=()=>goDay(b.dataset.gd));
+  $$('#dhBody [data-hv]').forEach(b=>b.onclick=()=>{ $('#dlgHist').close(); openVisit(b.dataset.hv); });
+  $$('#dhBody [data-ec2]').forEach(b=>b.onclick=()=>openCtl(b.dataset.ec2));
+}
+
+/* ---------- Seguimiento ---------- */
+let ctlTab='aviso';
+const activeCtls=()=>S.controls.filter(c=>c.status==='pend'&&c.notify<=todayISO());
+$$('#cTabs [data-ct]').forEach(b=>b.onclick=()=>{ ctlTab=b.dataset.ct; $$('#cTabs [data-ct]').forEach(x=>x.setAttribute('aria-pressed',x===b)); renderCtls(); });
+$('#cQ').oninput=()=>renderCtls();
+function renderCtls(){
+  if(!$('#v-seguimiento').classList.contains('on')) return;
+  const t=todayISO(), q=normQ($('#cQ').value);
+  let list=S.controls.filter(c=>ctlTab==='aviso'?(c.status==='pend'&&c.notify<=t):ctlTab==='prox'?(c.status==='pend'&&c.notify>t):c.status!=='pend');
+  if(q) list=list.filter(c=>{const p=pat(c.patientId)||{}; return (p.dni||'').includes(q)||normQ(p.nom).includes(q);});
+  list.sort((a,b)=>ctlTab==='hecho'?(b.doneDate||'').localeCompare(a.doneDate||''):ctlTab==='prox'?a.notify.localeCompare(b.notify):a.due.localeCompare(b.due));
+  if(!list.length){ $('#cList').innerHTML='<div class="empty">'+({aviso:'No hay controles que avisar hoy.',prox:'No hay controles programados.',hecho:'Aún no hay controles cerrados.'}[ctlTab])+'</div>'; return; }
+  $('#cList').innerHTML=list.slice(0,300).map(c=>{
+    const p=pat(c.patientId)||{}, from=S.visits.find(v=>v.id===c.fromVisitId), venc=c.status==='pend'&&c.due<t;
+    const st=c.status==='hecho'?'<span class="tag">hecho '+fmtD(c.doneDate)+'</span>':c.status==='desc'?'<span class="tag g">descartado</span>':venc?'<span class="tag e">vencido</span>':'';
+    return '<div class="row2"><div class="grow"><b>'+esc(p.nom||'¿?')+'</b> '+st+'<div class="muted">DNI '+esc(p.dni||'—')+'</div><div>'+esc(c.motivo)+(c.code?' <span class="tag">'+esc(c.code)+'</span>':'')+'</div><div class="muted">Control '+fmtD(c.due)+' · aviso desde '+fmtD(c.notify)+(from?' · origen '+fmtD(from.date):'')+(c.nota?' · '+esc(c.nota):'')+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px">'+(c.status==='pend'?'<button class="btn sm pri" data-cv="'+c.id+'">Registrar atención</button><button class="btn sm" data-cdn="'+c.id+'">Marcar hecho</button>':'')+'<button class="btn sm" data-ce="'+c.id+'">Editar</button></div></div>';
+  }).join('');
+  $$('#cList [data-cv]').forEach(b=>b.onclick=()=>{ const c=S.controls.find(x=>x.id===b.dataset.cv); openVisit(null); V.patientId=c.patientId; drawVisit(); });
+  $$('#cList [data-cdn]').forEach(b=>b.onclick=()=>{ const c=S.controls.find(x=>x.id===b.dataset.cdn); c.status='hecho'; c.doneDate=todayISO(); save(); render(); });
+  $$('#cList [data-ce]').forEach(b=>b.onclick=()=>openCtl(b.dataset.ce));
+}
+let T=null;
+function openCtl(id){
+  T=S.controls.find(c=>c.id===id); if(!T) return;
+  const p=pat(T.patientId)||{};
+  $('#t_pat').innerHTML='<b>'+esc(p.nom||'')+'</b> <span class="muted">DNI '+esc(p.dni||'—')+'</span>';
+  $('#t_mot').value=T.motivo; $('#t_code').value=T.code||''; $('#t_due').value=T.due; $('#t_not').value=T.notify; $('#t_st').value=T.status; $('#t_nota').value=T.nota||'';
+  $('#dtMsgs').innerHTML=''; $('#dlgCtl').showModal();
+}
+$('#t_due').onchange=()=>{ const gap=T.due&&T.notify?(new Date(T.due)-new Date(T.notify))/864e5:15; if($('#t_due').value) $('#t_not').value=addDays($('#t_due').value,-gap); };
+$('#dtSave').onclick=()=>{
+  const due=$('#t_due').value, nt=$('#t_not').value, st=$('#t_st').value;
+  if(!$('#t_mot').value.trim()||!due||!nt){ $('#dtMsgs').innerHTML='<div class="msg e">Completa motivo, fecha del control y fecha de aviso.</div>'; return; }
+  if(nt>due){ $('#dtMsgs').innerHTML='<div class="msg e">El aviso no puede ser después de la fecha del control.</div>'; return; }
+  Object.assign(T,{motivo:$('#t_mot').value.trim(),code:$('#t_code').value.trim().toUpperCase(),due,notify:nt,nota:$('#t_nota').value.trim()});
+  if(st!==T.status){ T.status=st; if(st==='pend'){delete T.doneDate;delete T.doneVisitId;} else T.doneDate=T.doneDate||todayISO(); }
+  save(); $('#dlgCtl').close(); render(); if($('#dlgHist').open) drawHist();
+};
+$('#dtDelete').onclick=()=>{ if(confirm('¿Eliminar este control?')){ S.controls=S.controls.filter(c=>c!==T); save(); $('#dlgCtl').close(); render(); if($('#dlgHist').open) drawHist(); } };
+
+/* ---------- HIS entregados ---------- */
+let entTab='pend';
+const daySig=d=>visitsOf(d).map(v=>v.id+':'+(v.updated||v.created)).join('|');
+function hisState(d){ const h=S.his[d]||{}; return {printed:h.printed,delivered:h.delivered,changed:!!h.printed&&h.sig!==daySig(d)}; }
+function markPrinted(d){ S.his[d]={...(S.his[d]||{}),printed:todayISO(),sig:daySig(d)}; save(); renderBadges(); renderPrStatus(d); }
+function setDelivered(d,on){
+  const h=hisState(d);
+  if(on && (!h.printed||h.changed) && !confirm(h.printed?'Hubo cambios después de imprimir este HIS. ¿Marcarlo como entregado igual?':'Todavía no descargaste ni imprimiste este HIS. ¿Marcarlo como entregado igual?')) return;
+  S.his[d]={...(S.his[d]||{}),delivered:on?todayISO():null}; save(); render();
+}
+function stTags(d){ const h=hisState(d);
+  return (h.delivered?'<span class="tag">entregado '+fmtD(h.delivered)+'</span>':'')+
+    (h.printed?'<span class="tag g">impreso '+fmtD(h.printed)+'</span>':'<span class="tag e">sin imprimir</span>')+
+    (h.changed?'<span class="tag w">cambió después de imprimir</span>':''); }
+$$('#eTabs [data-et]').forEach(b=>b.onclick=()=>{ entTab=b.dataset.et; $$('#eTabs [data-et]').forEach(x=>x.setAttribute('aria-pressed',x===b)); renderEnt(); });
+const workDays=()=>[...new Set(S.visits.map(v=>v.date))].sort().reverse();
+function renderEnt(){
+  if(!$('#v-entregas').classList.contains('on')) return;
+  const days=workDays().filter(d=>entTab==='todo'||!hisState(d).delivered);
+  if(!days.length){ $('#eList').innerHTML='<div class="empty">'+(entTab==='pend'?'No hay HIS pendientes de entregar.':'Aún no hay atenciones registradas.')+'</div>'; return; }
+  $('#eList').innerHTML=days.map(d=>{ const h=hisState(d), n=visitsOf(d).length, rows=rowsFor(d).length;
+    return '<div class="row2'+(h.delivered?'':' clickable')+'" data-eg="'+(h.delivered?'':d)+'"><div class="grow"><b>'+fmtD(d)+'</b> <span class="muted">'+dayName(d)+'</span><div class="muted">'+n+' atención(es) · '+rows+' fila(s) · '+Math.max(1,Math.ceil(rows/25))+' juego(s)</div><div>'+stTags(d)+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px"><button class="btn sm" data-ev="'+d+'">Ver HIS</button>'+(h.delivered?'<button class="btn sm" data-eu="'+d+'">Deshacer entrega</button>':'<button class="btn sm pri" data-ed="'+d+'">Marcar entregado</button>')+'</div></div>';
+  }).join('');
+  $$('#eList [data-eg]').forEach(r=>r.onclick=e=>{ if(e.target.closest('button')||!r.dataset.eg) return; goDay(r.dataset.eg,'imprimir'); });
+  $$('#eList [data-ev]').forEach(b=>b.onclick=()=>goDay(b.dataset.ev,'imprimir'));
+  $$('#eList [data-ed]').forEach(b=>b.onclick=()=>setDelivered(b.dataset.ed,true));
+  $$('#eList [data-eu]').forEach(b=>b.onclick=()=>setDelivered(b.dataset.eu,false));
+}
+function renderPrStatus(d){
+  const box=$('#prStatus'); if(!box) return;
+  if(!visitsOf(d).length){ box.innerHTML=''; return; }
+  const h=hisState(d);
+  box.innerHTML='<div class="bar">'+stTags(d)+'<span class="grow"></span>'+(h.delivered?'<button class="btn sm" id="prUndo">Deshacer entrega</button>':'<button class="btn sm pri" id="prDel">Marcar entregado</button>')+'</div>';
+  if(h.delivered) $('#prUndo').onclick=()=>setDelivered(d,false); else $('#prDel').onclick=()=>setDelivered(d,true);
+}
+
+/* ---------- Paquetes ---------- */
+function renderPacks(){
+  if(!$('#v-paquetes').classList.contains('on')) return;
+  if(!S.packs.length){ $('#pkList').innerHTML='<div class="empty">No hay paquetes. Crea uno con los códigos que registras juntos con frecuencia.</div>'; return; }
+  $('#pkList').innerHTML=S.packs.map(k=>{ const miss=k.items.filter(i=>!codeOf(i.code));
+    return '<div class="row2"><div class="grow"><b>'+esc(k.name)+'</b>'+(k.ej?'<span class="tag w">propuesta</span>':'')+'<div class="muted">'+k.items.map(i=>{const c=codeOf(i.code);return esc(i.code)+(c?' '+esc(c.desc):'')+(i.tipo?' ('+i.tipo+')':'')}).join(' · ')+'</div>'+(miss.length?'<div class="msg w" style="margin-top:6px">'+miss.map(i=>esc(i.code)).join(', ')+' ya no está en el catálogo: se agregará sin validar.</div>':'')+'</div><button class="btn sm" data-pe="'+k.id+'">Editar</button></div>';
+  }).join('');
+  $$('#pkList [data-pe]').forEach(b=>b.onclick=()=>openPack(b.dataset.pe));
+}
+let K=null;
+$('#btnNewPack').onclick=()=>openPack(null);
+function openPack(id){
+  const ex=id&&S.packs.find(k=>k.id===id);
+  K=ex?JSON.parse(JSON.stringify(ex)):{id:uid(),name:'',items:[]};
+  $('#dkTitle').textContent=ex?'Editar paquete':'Nuevo paquete';
+  $('#k_name').value=K.name; $('#k_search').value=''; $('#k_sugg').innerHTML=''; $('#dkMsgs').innerHTML='';
+  $('#dkDelete').hidden=!ex; drawPack(); $('#dlgPack').showModal();
+}
+function drawPack(){
+  $('#k_items').innerHTML=K.items.length?K.items.map((it,ix)=>{ const c=codeOf(it.code), cpt=c&&c.kind==='CPT';
+    return '<div class="item"><div class="hd"><span class="code">'+esc(it.code)+'</span><span class="grow">'+esc(c?c.desc:'(no está en el catálogo)')+'</span><button class="btn sm" data-ku="'+ix+'"'+(ix?'':' disabled')+'>↑</button><button class="btn sm dan" data-kr="'+ix+'">Quitar</button></div>'+
+      '<div class="bar"><span class="muted">Tipo</span>'+(cpt?'<span>D</span>':'<select class="in" style="width:auto" data-kt="'+ix+'"><option value="">Según regla / historial</option>'+['P','D','R'].map(t=>'<option'+(it.tipo===t?' selected':'')+'>'+t+'</option>').join('')+'</select>')+
+      '<span class="muted">LAB</span><input class="in" style="width:70px" data-kl="'+ix+'" value="'+esc(it.lab||'')+'" placeholder="'+esc(c&&c.lab||'')+'"></div></div>';
+  }).join(''):'<p class="muted">Aún no tiene códigos.</p>';
+  $$('#k_items [data-kr]').forEach(b=>b.onclick=()=>{K.items.splice(+b.dataset.kr,1);drawPack()});
+  $$('#k_items [data-ku]').forEach(b=>b.onclick=()=>{const i=+b.dataset.ku;[K.items[i-1],K.items[i]]=[K.items[i],K.items[i-1]];drawPack()});
+  $$('#k_items [data-kt]').forEach(e=>e.onchange=()=>{K.items[+e.dataset.kt].tipo=e.value});
+  $$('#k_items [data-kl]').forEach(e=>e.oninput=()=>{K.items[+e.dataset.kl].lab=e.value.trim()});
+}
+$('#k_search').oninput=e=>{
+  const q=normQ(e.target.value); if(!q){$('#k_sugg').innerHTML='';return}
+  const res=S.codes.filter(c=>!K.items.some(i=>i.code===c.code)&&(c.code.includes(q)||normQ(c.desc).includes(q))).slice(0,12);
+  $('#k_sugg').innerHTML='<div class="sugg">'+(res.map(c=>'<button data-kp="'+esc(c.code)+'"><b>'+esc(c.code)+'</b> '+esc(c.desc)+'</button>').join('')||'<div class="muted" style="padding:8px">Sin resultados en el catálogo.</div>')+'</div>';
+  $$('#k_sugg [data-kp]').forEach(b=>b.onclick=()=>{K.items.push({code:b.dataset.kp,tipo:'',lab:''});$('#k_search').value='';$('#k_sugg').innerHTML='';drawPack()});
+};
+$('#dkSave').onclick=()=>{
+  K.name=$('#k_name').value.trim(); const E=[];
+  if(!K.name) E.push('Ponle un nombre al paquete.');
+  if(!K.items.length) E.push('Agrega al menos un código.');
+  if(S.packs.some(k=>k.id!==K.id&&normQ(k.name)===normQ(K.name))) E.push('Ya existe un paquete con ese nombre.');
+  if(E.length){$('#dkMsgs').innerHTML=msgsHTML({E,W:[]});return}
+  delete K.ej;
+  const i=S.packs.findIndex(k=>k.id===K.id); if(i>=0) S.packs[i]=K; else S.packs.push(K);
+  save(); $('#dlgPack').close(); render();
+};
+$('#dkDelete').onclick=()=>{ if(confirm('¿Eliminar el paquete “'+K.name+'”? Las atenciones ya registradas no cambian.')){ S.packs=S.packs.filter(k=>k.id!==K.id); save(); $('#dlgPack').close(); render(); } };
+
+/* ---------- Avisos: badges y copia de seguridad ---------- */
+function renderBadges(){
+  const nC=activeCtls().length, t=todayISO();
+  const nH=workDays().filter(d=>d<t&&!hisState(d).delivered).length;
+  $('#bdgCtl').hidden=!nC; $('#bdgCtl').textContent=nC;
+  $('#bdgHis').hidden=!nH; $('#bdgHis').textContent=nH;
+}
+function renderBackupBanner(){
+  let el=$('#bkBanner'); if(!el){ el=document.createElement('div'); el.id='bkBanner'; $('#storeWarn').after(el); }
+  const t=todayISO();
+  const days=S.lastBackup?Math.floor((Date.now()-S.lastBackup)/864e5):null;
+  const need=S.visits.length && S.bkSnooze!==t && (days===null ? S.visits.length>=5 : days>=7);
+  el.innerHTML=need?'<div class="msg w" style="margin-bottom:12px"><div class="bar"><span class="grow">'+(days===null?'Todavía no has descargado ninguna copia de seguridad.':'Hace '+days+' días que no descargas la copia de seguridad.')+' Si se borra el navegador, se pierden los registros.</span><button class="btn sm pri" id="bkNow">Descargar ahora</button><button class="btn sm" id="bkLater">Recordar mañana</button></div></div>':'';
+  if(need){ $('#bkNow').onclick=()=>doBackup(); $('#bkLater').onclick=()=>{ S.bkSnooze=t; save(); renderBackupBanner(); }; }
+}
+
 /* ---------- inicio ---------- */
 load();
 $('#workDate').value=todayISO();
 $('#workDate').onchange=render; $('#workTurno').onchange=render;
+$('#attFilter').oninput=renderAtt;
 window.addEventListener('resize',()=>{ if($('#v-imprimir').classList.contains('on')) renderPrint(); });
 render();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
