@@ -7,7 +7,7 @@
 <meta name="theme-color" content="#1d7a63">
 <link rel="apple-touch-icon" href="icon-192.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<title>HIS Odonto · Registro diario</title>
+<title>HIS SERUMS · Registro diario</title>
 <style>
 :root{
   --ink:#16302b; --ink2:#4b635d; --paper:#ffffff; --bg:#eef3f1; --line:#cfdcd7;
@@ -18,6 +18,7 @@
   --ink:#e4eeea; --ink2:#a7bbb4; --paper:#17221f; --bg:#0f1715; --line:#2d3d38; --acc:#4cc3a0; --acc-2:#1b332c;
   --warn:#f0b35a; --warn-bg:#33270f; --err:#ff8a7d; --err-bg:#3a1a17; } }
 *,*::before,*::after{box-sizing:inherit}
+[hidden]{display:none!important}
 html,body{margin:0}
 body{background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif}
 button,input,select{font:inherit;color:inherit}
@@ -100,6 +101,10 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
 .ctl{display:grid;grid-template-columns:1fr auto;gap:6px;border:1px dashed var(--line);border-radius:10px;padding:9px;margin-bottom:8px}
 .ctl .grid{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
 .clickable{cursor:pointer}.clickable:hover{background:var(--acc-2)}
+.thead{display:flex;gap:8px;align-items:center;margin:12px 0 0;padding:6px 10px;border-radius:8px;background:var(--acc-2);color:var(--acc);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--acc);border-radius:10px;overflow:hidden}
+.seg button{border:0;background:var(--paper);color:var(--acc);padding:8px 16px;cursor:pointer;font-weight:600}
+.seg button[aria-pressed="true"]{background:var(--acc);color:#fff}
 #printArea{display:none}
 @media print{
   @page{size:A4 portrait;margin:0}
@@ -117,10 +122,9 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
 <body>
 <header class="top">
   <div class="row">
-    <h1>HIS Odonto<small id="hdrEess"></small></h1>
+    <h1>HIS SERUMS<small id="hdrEess"></small></h1>
     <div class="datebox">
       <input type="date" id="workDate" aria-label="Fecha de atención">
-      <select id="workTurno" aria-label="Turno"><option value="M">Mañana</option><option value="T">Tarde</option><option value="N">Noche</option></select>
     </div>
   </div>
   <nav class="tabs" role="tablist">
@@ -171,6 +175,7 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
     <div class="card">
       <div class="bar"><h2 class="grow" id="prTitle">HIS del día</h2><button class="btn" id="btnPrint">Imprimir</button><button class="btn pri" id="btnPdf">Descargar PDF</button></div>
       <div id="pdfShare" hidden class="msg ok" style="margin-top:10px">PDF descargado. <button class="btn sm" id="btnShare">Compartir / imprimir PDF</button></div>
+      <div id="prTurno" style="margin-top:10px"></div>
       <div id="prStatus" style="margin-top:10px"></div>
       <p class="muted" id="prInfo"></p>
       <div id="prMsgs" class="msgs"></div>
@@ -248,6 +253,16 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
         <label class="f">Distrito<input id="s_dist"></label>
         <label class="f">Centro poblado<input id="s_cp"></label>
       </div>
+      <h3>Turnos</h3>
+      <p class="muted" style="margin-top:0">La app sugiere el turno según la hora del equipo. Cerca del cambio de turno (zona de duda) no sugiere nada y te pide elegir.</p>
+      <div class="grid">
+        <label class="f">Inicio turno mañana<input id="s_tm" type="time"></label>
+        <label class="f">Inicio turno tarde<input id="s_tt" type="time"></label>
+        <label class="f">Inicio turno noche<input id="s_tn" type="time"></label>
+        <label class="f">¿Trabajas de noche?<select id="s_tno"><option value="">No</option><option value="1">Sí</option></select></label>
+        <label class="f">Zona de duda: minutos antes del cambio<input id="s_ta" inputmode="numeric"></label>
+        <label class="f">Zona de duda: minutos después del cambio<input id="s_td" inputmode="numeric"></label>
+      </div>
       <div class="bar" style="margin-top:12px"><button class="btn pri" id="btnSaveSet">Guardar ajustes</button><span id="setMsg" class="muted"></span></div>
     </div>
     <div class="card">
@@ -275,6 +290,8 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
     </div>
     <div id="dvPatInfo"></div>
 
+    <h3>Turno</h3>
+    <div id="dvTurno"></div>
     <h3>Diagnósticos y procedimientos</h3>
     <div class="chips" id="dvPacks" style="margin-bottom:8px"></div>
     <div class="chips" id="dvFavs"></div>
@@ -325,7 +342,7 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
     <p class="muted" style="margin-top:0">Sirve para calcular bien N / C / R. Después la app lo calcula sola con su propio historial.</p>
     <div class="grid">
       <label class="f">En el establecimiento<select id="p_pe"></select></label>
-      <label class="f">En odontología<select id="p_ps"></select></label>
+      <label class="f"><span id="p_psLbl">En el servicio</span><select id="p_ps"></select></label>
     </div>
     <div class="msgs" id="dpMsgs"></div>
   </div>
@@ -362,6 +379,26 @@ nav.tabs button[aria-selected="true"] .bdg{background:var(--acc);color:#fff}
     <button class="btn" data-close>Cancelar</button>
     <button class="btn pri" id="dcSave">Guardar código</button>
   </div>
+</dialog>
+
+<!-- Dialog servicio (primer uso) -->
+<dialog id="dlgServ">
+  <div class="dh"><strong>Bienvenido a HIS SERUMS</strong></div>
+  <div class="db">
+    <p style="margin-top:0">¿En qué servicio vas a registrar tus atenciones? Saldrá como UPSS en la cabecera del HIS.</p>
+    <div class="chips" id="svOpts"></div>
+    <label class="f" id="svOtroWrap" hidden style="margin-top:10px">Nombre del servicio<input id="svOtro" placeholder="ej. CRED"></label>
+    <p class="muted" id="svNota"></p>
+    <div class="msgs" id="svMsgs"></div>
+  </div>
+  <div class="df"><span class="grow"></span><button class="btn pri" id="svOk">Continuar</button></div>
+</dialog>
+
+<!-- Dialog revisión de turnos -->
+<dialog id="dlgTurno">
+  <div class="dh"><strong>Revisa los turnos del día</strong><button class="btn sm" data-close>Cerrar</button></div>
+  <div class="db" id="dtuBody"></div>
+  <div class="df"><span class="grow"></span><button class="btn" data-close>Revisar después</button><button class="btn pri" id="dtuOk">Está correcto</button></div>
 </dialog>
 
 <!-- Dialog historial paciente -->
@@ -850,10 +887,16 @@ const SEED_PACKS=[
  {id:'pk1',name:'Preventivo niño',ej:true,items:['D0150','D1330','D1310','D1110','D1206','D1351'].map(code=>({code,tipo:'',lab:''}))},
  {id:'pk2',name:'Caries + resina',ej:true,items:['K021','D2330'].map(code=>({code,tipo:'',lab:''}))}
 ];
+const SERVICIOS=['ODONTOLOGÍA','MEDICINA GENERAL','OBSTETRICIA','ENFERMERÍA','NUTRICIÓN','PSICOLOGÍA'];
+const esOdonto=()=>normTxt(S.settings.servicio||'').startsWith('ODONTOLOG');
+const normTxt=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const GRUPOS=[['n1','Niño 0–6 años',0,6],['n2','Niño 7–11 años',7,11],['ad','Adolescente 12–17',12,17],['jo','Adulto joven 18–29',18,29],['adu','Adulto 30–59',30,59],['am','Adulto mayor 60+',60,999]];
 function migrate(){
-  S.packs=S.packs||JSON.parse(JSON.stringify(SEED_PACKS));
-  S.controls=S.controls||[]; S.his=S.his||{};
+  // instalaciones anteriores (sin servicio elegido) eran de odontología
+  if(!S.settings.servicio && !S.nuevo) S.settings.servicio=S.settings.upss||'ODONTOLOGÍA';
+  S.packs=S.packs||(esOdonto()?JSON.parse(JSON.stringify(SEED_PACKS)):[]);
+  S.controls=S.controls||[]; S.his=S.his||{}; S.turnoOk=S.turnoOk||{};
+  Object.keys(S.his).filter(k=>!k.includes('|')).forEach(d=>{ const ts=TORD.filter(t=>S.visits.some(v=>v.date===d&&(v.turno||'M')===t)); (ts.length?ts:['M']).forEach(t=>{ S.his[d+'|'+t]={...S.his[d],sig:null}; }); delete S.his[d]; });
   S.codes.forEach(c=>{ if(c.ctl===undefined){ c.ctl=(c.ej&&c.code==='D1206')?'6':''; c.ctlAv=(c.ej&&c.code==='D1206')?'15':''; } });
 }
 
@@ -861,11 +904,35 @@ let S;           // estado
 let memOnly=false;
 function load(){
   let raw=null; try{raw=localStorage.getItem(KEY)}catch(e){memOnly=true}
-  S=raw?JSON.parse(raw):{settings:{eess:'CENTRO DE SALUD YORONGOS',upss:'ODONTOLOGÍA',resp:'',dni:'',fin:2,etnia:'58',dist:'YORONGOS',cp:''},patients:[],codes:SEED_CODES,visits:[],lastBackup:null};
+  S=raw?JSON.parse(raw):{settings:{eess:'CENTRO DE SALUD YORONGOS',upss:'',resp:'',dni:'',fin:2,etnia:'58',dist:'YORONGOS',cp:''},patients:[],codes:[],packs:[],visits:[],lastBackup:null,nuevo:true};
   migrate();
 }
 function save(){ try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){memOnly=true;showStoreWarn()} }
 function showStoreWarn(){ if(memOnly) $('#storeWarn').innerHTML='<div class="msg e" style="margin-bottom:12px">Este navegador no permite guardar datos: lo que registres se perderá al cerrar. Abre el archivo en Chrome o Edge.</div>'; }
+
+/* ---------- turnos ---------- */
+const TN={M:'Mañana',T:'Tarde',N:'Noche'}, TORD=['M','T','N'];
+function tcfg(){ return Object.assign({m:'07:00',t:'13:00',n:'19:00',noche:false,antes:30,despues:45},S.settings.turnos||{}); }
+const mins=x=>{const [h,m]=String(x).split(':');return (+h)*60+(+m||0)};
+const hhmm=ts=>{const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')};
+const localISO=ts=>{const d=new Date(ts);d.setMinutes(d.getMinutes()-d.getTimezoneOffset());return d.toISOString().slice(0,10)};
+function turnoEnMinuto(x){ const c=tcfg(); if(c.noche&&(x>=mins(c.n)||x<mins(c.m))) return 'N'; return x>=mins(c.t)?'T':'M'; }
+function enZonaDuda(x){ const c=tcfg(); return [mins(c.t)].concat(c.noche?[mins(c.n)]:[]).some(k=>x>=k-c.antes&&x<=k+c.despues); }
+function turnoPorHora(){ const n=new Date(), x=n.getHours()*60+n.getMinutes(); return enZonaDuda(x)?{t:null,duda:true}:{t:turnoEnMinuto(x),duda:false}; }
+const turnoOf=v=>v.turno||'M';
+const turnosOf=d=>TORD.filter(t=>S.visits.some(v=>v.date===d&&turnoOf(v)===t));
+function sospechas(d){
+  const vs=visitsOf(d), out=[];
+  vs.forEach((v,i)=>{
+    if(!(v.created>1e12) || localISO(v.created)!==v.date) return;   // solo registradas el mismo día
+    const x=new Date(v.created).getHours()*60+new Date(v.created).getMinutes();
+    const razon=[];
+    if(!enZonaDuda(x) && turnoEnMinuto(x)!==turnoOf(v)) razon.push('se registró a las '+hhmm(v.created)+' pero está en turno '+TN[turnoOf(v)].toLowerCase());
+    else if(i && turnoOf(vs[i-1])!==turnoOf(v) && enZonaDuda(x)) razon.push('se registró a las '+hhmm(v.created)+', cerca del cambio de turno');
+    if(razon.length) out.push({v,razon:razon.join('; ')});
+  });
+  return out;
+}
 
 /* ---------- lógica de negocio ---------- */
 const pat=id=>S.patients.find(p=>p.id===id);
@@ -899,6 +966,7 @@ function suggestTipo(v,code){
 function matchReq(r,codes){ r=r.trim().toUpperCase(); return codes.some(c=>c===r||c.startsWith(r)); }
 function validate(v){
   const E=[],W=[], p=pat(v.patientId);
+  if(!v.turno) E.push('Elige el turno de la atención.');
   if(!p){E.push('Elige o registra un paciente.');return {E,W}}
   if(!p.nom) E.push('El paciente no tiene nombre.');
   if(!p.sexo) E.push('Falta el sexo del paciente.');
@@ -934,7 +1002,7 @@ function validate(v){
 }
 
 /* ---------- UI general ---------- */
-function setView(v){ $$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===v)); $$('section.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v)); render(); }
+function setView(v){ $$('nav.tabs button').forEach(b=>b.setAttribute('aria-selected',b.dataset.v===v)); $$('section.view').forEach(s=>s.classList.toggle('on',s.id==='v-'+v)); render(); if(v==='imprimir') reviewTurnos(wd()); }
 $$('nav.tabs button').forEach(b=>b.onclick=()=>setView(b.dataset.v));
 $$('[data-close]').forEach(b=>b.onclick=()=>b.closest('dialog').close());
 const wd=()=>$('#workDate').value||todayISO();
@@ -950,22 +1018,29 @@ const visitsOf=d=>S.visits.filter(v=>v.date===d).sort((a,b)=>a.created-b.created
 
 function renderAtt(){
   const d=wd(), vs=visitsOf(d);
-  const rows=vs.reduce((n,v)=>n+Math.max(1,Math.ceil(v.items.length/3)),0);
   $('#attTitle').textContent='Atenciones del '+fmtD(d)+(vs.length?' ('+vs.length+')':'');
   const nAl=activeCtls().length;
   $('#attAlerts').innerHTML=nAl?'<div class="msg w" style="margin-bottom:10px">'+nAl+' paciente(s) tienen control pendiente. <button class="btn sm" id="goCtl">Ver seguimiento</button></div>':'';
   if(nAl) $('#goCtl').onclick=()=>setView('seguimiento');
   $('#attFilter').hidden=!vs.length;
   if(!vs.length){ $('#attList').innerHTML='<div class="empty">Aún no hay atenciones este día.<br>Toca <b>+ Nueva atención</b> para registrar la primera.</div>'; return; }
-  const fq=normQ($('#attFilter').value);
-  let n=0;
-  const html=vs.map(v=>{
-    const p=pat(v.patientId)||{}, a=age(p.fnac,v.date), val=validate(v); n++;
-    if(fq && !(p.dni||'').includes(fq) && !normQ(p.nom).includes(fq)) return '';
-    const bad=val.E.length?'<span class="tag w">'+val.E.length+' error(es)</span>':'';
-    return '<div class="visit"><div class="n">'+n+'</div><div><b>'+esc(p.nom||'¿?')+'</b>'+bad+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · '+(p.sexo||'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div><div class="codes">'+v.items.map(i=>esc(i.code)+' '+i.tipo).join(' · ')+'</div></div><button class="btn sm" data-edit="'+v.id+'">Editar</button></div>';
-  }).join('');
-  $('#attList').innerHTML=(html||'<div class="empty">Ninguna atención de este día coincide con “'+esc($('#attFilter').value)+'”.</div>')+'<p class="muted" style="margin:10px 0 0">Ocupan '+rows+' de 25 filas por juego de HIS (anverso + reverso).</p>';
+  const fq=normQ($('#attFilter').value), sus=new Set(S.turnoOk[d]===daySigAll(d)?[]:sospechas(d).map(x=>x.v.id));
+  let html='', any=false;
+  turnosOf(d).forEach(t=>{
+    const tv=vs.filter(v=>turnoOf(v)===t), rows=rowsFor(d,t).length;
+    html+='<div class="thead"><span class="grow">'+TN[t]+' ('+tv.length+')</span><span style="font-weight:400;font-size:13px">'+rows+' de 25 filas</span></div>';
+    tv.forEach((v,ix)=>{
+      const p=pat(v.patientId)||{};
+      if(fq && !(p.dni||'').includes(fq) && !normQ(p.nom).includes(fq)) return;
+      any=true;
+      const a=age(p.fnac,v.date), val=validate(v);
+      const bad=val.E.length?'<span class="tag w">'+val.E.length+' error(es)</span>':'';
+      const sp=sus.has(v.id)?'<span class="tag w">revisar turno</span>':'';
+      html+='<div class="visit"><div class="n">'+(ix+1)+'</div><div><b>'+esc(p.nom||'¿?')+'</b>'+bad+sp+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · '+(p.sexo||'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+(v.created>1e12?' · reg. '+hhmm(v.created):'')+'</div><div class="codes">'+v.items.map(i=>esc(i.code)+' '+i.tipo).join(' · ')+'</div></div><button class="btn sm" data-edit="'+v.id+'">Editar</button></div>';
+    });
+  });
+  if(!any) html+='<div class="empty">Ninguna atención de este día coincide con “'+esc($('#attFilter').value)+'”.</div>';
+  $('#attList').innerHTML=html;
   $$('#attList [data-edit]').forEach(b=>b.onclick=()=>openVisit(b.dataset.edit));
 }
 
@@ -974,7 +1049,12 @@ let V=null;
 $('#btnNew').onclick=()=>openVisit(null);
 function openVisit(id){
   const ex=id&&S.visits.find(v=>v.id===id);
-  V=ex?JSON.parse(JSON.stringify(ex)):{id:uid(),date:wd(),turno:$('#workTurno').value,patientId:null,items:[],created:Date.now()};
+  V=ex?JSON.parse(JSON.stringify(ex)):{id:uid(),date:wd(),turno:null,patientId:null,items:[],created:Date.now()};
+  turnoNota=''; turnoDuda=false;
+  if(!ex){
+    if(V.date===todayISO()){ const r=turnoPorHora(); V.turno=r.t; turnoDuda=r.duda; if(r.t){ V.turnoAuto=true; turnoNota='según la hora del equipo'; } }
+    else { const last=visitsOf(V.date).slice(-1)[0]; if(last){ V.turno=turnoOf(last); V.turnoAuto=true; turnoNota='igual que la última atención de ese día'; } }
+  }
   $('#dvTitle').textContent=ex?'Editar atención · '+fmtD(V.date):'Nueva atención · '+fmtD(V.date);
   $('#dvDelete').hidden=!ex;
   ['Peso','Talla','Hb'].forEach(k=>$('#dv'+k).value=V[k.toLowerCase()]||'');
@@ -982,13 +1062,28 @@ function openVisit(id){
   $('#dvOpt').open=!!(V.peso||V.talla||V.hb||V.fur);
   $('#dvPatSearch').value=''; $('#dvPatSugg').innerHTML=''; $('#dvCodeSearch').value=''; $('#dvCodeSugg').innerHTML='';
   V._ctls=S.controls.filter(c=>c.fromVisitId===V.id).map(c=>({...c}));
-  const h=S.his[V.date];
-  $('#dvWarn').innerHTML=h&&h.delivered?'<div class="msg w" style="margin-bottom:10px">El HIS de este día ya se entregó el '+fmtD(h.delivered)+'. Si cambias algo, el papel entregado ya no coincidirá.</div>':
-    h&&h.printed?'<div class="msg w" style="margin-bottom:10px">El HIS de este día ya se imprimió. Si cambias algo, tendrás que volver a imprimirlo.</div>':'';
   drawVisit(); $('#dlgVisit').showModal();
   if(!V.patientId) setTimeout(()=>$('#dvPatSearch').focus(),50);
 }
+let turnoNota='', turnoDuda=false;
+function drawWarn(){
+  const h=V.turno&&S.his[hk(V.date,V.turno)];
+  $('#dvWarn').innerHTML=h&&h.delivered?'<div class="msg w" style="margin-bottom:10px">El HIS de este día ya se entregó el '+fmtD(h.delivered)+'. Si cambias algo, el papel entregado ya no coincidirá.</div>':
+    h&&h.printed?'<div class="msg w" style="margin-bottom:10px">El HIS de este día y turno ya se imprimió. Si cambias algo, tendrás que volver a imprimirlo.</div>':'';
+}
+function drawTurno(){
+  const c=tcfg(), opts=TORD.filter(t=>t!=='N'||c.noche||V.turno==='N');
+  const orig=S.visits.find(v=>v.id===V.id);
+  let note='';
+  if(!V.turno && turnoDuda) note='<div class="msg w" style="margin-top:6px">Estás cerca del cambio de turno ('+c.t+'). Elige a qué turno pertenece esta atención.</div>';
+  else if(!V.turno) note='<div class="msg w" style="margin-top:6px">Elige el turno de esta atención.</div>';
+  else if(V.turnoAuto && turnoNota) note='<p class="muted" style="margin:6px 0 0">Sugerido '+turnoNota+'. Toca otro si no corresponde.</p>';
+  if(orig && orig.turno && V.turno && orig.turno!==V.turno) note+='<p class="muted" style="margin:6px 0 0">Pasará del HIS de la '+TN[orig.turno].toLowerCase()+' al de la '+TN[V.turno].toLowerCase()+'.</p>';
+  $('#dvTurno').innerHTML='<div class="chips">'+opts.map(t=>'<button class="chip'+(V.turnoAuto&&V.turno===t?' auto':'')+'" data-tu="'+t+'" aria-pressed="'+(V.turno===t)+'">'+TN[t]+'</button>').join('')+'</div>'+note;
+  $$('#dvTurno [data-tu]').forEach(b=>b.onclick=()=>{ V.turno=b.dataset.tu; V.turnoAuto=false; drawVisit(); });
+}
 function drawVisit(){
+  drawWarn(); drawTurno();
   const p=pat(V.patientId);
   $('#dvPatPick').hidden=!!p;
   $('#dvFurWrap').hidden=!(p&&p.sexo==='F');
@@ -1088,7 +1183,7 @@ $('#dvSave').onclick=()=>{
   if(val.E.length){ $('#dvMsgs').innerHTML=msgsHTML(val); $('#dvMsgs').scrollIntoView({behavior:'smooth',block:'center'}); return; }
   const E2=V._ctls.filter(x=>x.status==='pend'&&(!x.due||!x.notify||x.notify>x.due)).length;
   if(E2){ $('#dvMsgs').innerHTML='<div class="msg e">Revisa las fechas de seguimiento: cada control necesita fecha, y el aviso no puede ser después del control.</div>'; return; }
-  const ctls=V._ctls; delete V._ctls; V.updated=Date.now();
+  const ctls=V._ctls; delete V._ctls; delete V.turnoAuto; V.updated=Date.now();
   const k=S.visits.findIndex(v=>v.id===V.id); if(k>=0) S.visits[k]=V; else S.visits.push(V);
   // controles propios de esta atención
   S.controls=S.controls.filter(c=>c.fromVisitId!==V.id).concat(ctls.map(c=>({...c,patientId:V.patientId})));
@@ -1121,6 +1216,7 @@ function openPat(id,fromVisit,q){
   $('#dpDelete').hidden=!ex||fromVisit;
   $('#p_fin').innerHTML=finOpts(P.fin);
   $('#p_pe').innerHTML=prevOpts(P.prevE); $('#p_ps').innerHTML=prevOpts(P.prevS);
+  $('#p_psLbl').textContent='En '+(S.settings.servicio||'el servicio').toLowerCase();
   ['dni','nom','fnac','sexo','hc','ff','etnia','dist','cp'].forEach(k=>$('#p_'+k).value=P[k]||'');
   $('#dpMsgs').innerHTML=''; $('#dlgPat').showModal();
 }
@@ -1188,18 +1284,19 @@ function renderCodes(){
 }
 
 /* ---------- Impresión ---------- */
-function rowsFor(d){
+const visitsOfT=(d,t)=>visitsOf(d).filter(v=>!t||turnoOf(v)===t);
+function rowsFor(d,t){
   const out=[];
   let prev=null;
-  visitsOf(d).forEach(v=>{ for(let i=0;i<Math.max(1,v.items.length);i+=3){ out.push({v,items:v.items.slice(i,i+3),cont:i>0||prev===v.patientId}); } prev=v.patientId; });
+  visitsOfT(d,t).forEach(v=>{ for(let i=0;i<Math.max(1,v.items.length);i+=3){ out.push({v,items:v.items.slice(i,i+3),cont:i>0||prev===v.patientId}); } prev=v.patientId; });
   return out;
 }
-function fillSheet(el,side,rows,d){
+function fillSheet(el,side,rows,d,t){
   const s=S.settings, put=(c,t,cls)=>{const td=el.querySelector('[data-c="'+side+c+'"]');if(!td)return;td.firstChild.textContent=t??'';td.classList.add('v');if(cls)td.classList.add(cls)};
   const mark=c=>{const td=el.querySelector('[data-c="'+side+c+'"]');if(td)td.classList.add('mk')};
   const y=d.slice(0,4), m=MESES[+d.slice(5,7)-1], hr=side==='a'?7:3;
   put('B'+hr,y); put('C'+hr,m,'vs'); put('D'+hr,s.eess,'vs'); put('K'+hr,s.upss,'vs'); put('S'+hr,s.dni,'vs'); put('T'+hr,s.resp,'vs');
-  if(side==='a'){ const t=(visitsOf(d)[0]||{}).turno||$('#workTurno').value; mark({M:'V5',T:'X5',N:'Z5'}[t]); }
+  if(side==='a' && t) mark({M:'V5',T:'X5',N:'Z5'}[t]);
   const first=side==='a'?12:8;
   rows.forEach((row,k)=>{
     const r=first+4*k, v=row.v, p=pat(v.patientId)||{}, a=age(p.fnac,v.date);
@@ -1217,46 +1314,51 @@ function fillSheet(el,side,rows,d){
     row.items.forEach((it,j)=>{ const rr=r+1+j; put('P'+rr,it.desc,'vs'); if(it.tipo) mark({P:'T',D:'U',R:'V'}[it.tipo]+rr); ['W','X','Y'].forEach((c,q)=>{if(it.lab[q]) put(c+rr,it.lab[q],'vs')}); put('Z'+rr,it.code,'vs'); });
   });
 }
-function buildPages(d){
-  const rows=rowsFor(d), pages=[]; const sets=Math.max(1,Math.ceil(rows.length/25));
+function buildPages(d,t){
+  const rows=rowsFor(d,t), pages=[]; const sets=Math.max(1,Math.ceil(rows.length/25));
   for(let s=0;s<sets;s++){
     const chunk=rows.slice(s*25,s*25+25);
     [['a',chunk.slice(0,12),TPL.a,TPL.wa,'Anverso'],['b',chunk.slice(12),TPL.b,TPL.wb,'Reverso']].forEach(([side,rs,html,w,lbl])=>{
       const pg=document.createElement('div'); pg.className='page'; pg.innerHTML='<div class="pl">Juego '+(s+1)+' · '+lbl+'</div>'+html;
-      fillSheet(pg,side,rs,d); pages.push(pg);
+      fillSheet(pg,side,rs,d,t); pages.push(pg);
     });
   }
   return pages;
 }
 function renderPrint(){
   if(!$('#v-imprimir').classList.contains('on')) return;
-  const d=wd(), vs=visitsOf(d), rows=rowsFor(d);
-  $('#prTitle').textContent='HIS del '+fmtD(d);
+  const d=wd(), ts=turnosOf(d);
+  if(!ts.includes(prT)) prT=ts[0]||null;
+  const vs=visitsOfT(d,prT), rows=rowsFor(d,prT);
+  $('#prTitle').textContent='HIS del '+fmtD(d)+(prT?' · '+TN[prT]:'');
+  $('#prTurno').innerHTML=ts.length>1?'<div class="bar"><span class="muted">Este día tiene '+ts.length+' turnos, cada uno con su HIS:</span><div class="seg">'+ts.map(t=>'<button data-pt="'+t+'" aria-pressed="'+(t===prT)+'">'+TN[t]+' ('+visitsOfT(d,t).length+')</button>').join('')+'</div></div>':'';
+  $$('#prTurno [data-pt]').forEach(b=>b.onclick=()=>{ prT=b.dataset.pt; renderPrint(); });
   const bad=vs.filter(v=>validate(v).E.length);
   $('#prMsgs').innerHTML=(!S.settings.resp||!S.settings.dni?'<div class="msg w">Completa tu nombre y DNI en Ajustes para que salgan en la cabecera.</div>':'')+
     (bad.length?'<div class="msg e">'+bad.length+' atención(es) tienen errores. Corrígelas en Atenciones antes de imprimir.</div>':'');
   $('#prInfo').textContent=vs.length?vs.length+' atenciones en '+rows.length+' filas · '+Math.ceil(rows.length/25)+' juego(s). Imprime en A4 vertical, escala 100% (o “tamaño real”). Si tu impresora imprime a doble cara, sale anverso y reverso en la misma hoja.':'No hay atenciones este día; se imprimirá el HIS en blanco.';
   const box=$('#preview'); box.innerHTML='';
-  const pages=buildPages(d); const avail=Math.max(280,box.clientWidth-20);
+  const pages=buildPages(d,prT); const avail=Math.max(280,box.clientWidth-20);
   pages.forEach(pg=>{ pg.style.setProperty('--u',Math.min(.6,avail/1432)+'px'); box.appendChild(pg); });
   renderProd(d);
-  renderPrStatus(d);
+  renderPrStatus(d,prT);
 }
+let prT=null;
 $('#btnPrint').onclick=()=>{
-  const d=wd(), bad=visitsOf(d).filter(v=>validate(v).E.length);
+  const d=wd(), bad=visitsOfT(d,prT).filter(v=>validate(v).E.length);
   if(bad.length && !confirm('Hay atenciones con errores. ¿Imprimir de todas formas?')) return;
-  const pa=$('#printArea'); pa.innerHTML=''; buildPages(d).forEach(p=>pa.appendChild(p)); window.print(); markPrinted(d);
+  const pa=$('#printArea'); pa.innerHTML=''; buildPages(d,prT).forEach(p=>pa.appendChild(p)); window.print(); if(prT) markPrinted(d,prT);
 };
 let lastPdf=null;
 $('#btnPdf').onclick=async()=>{
-  const d=wd(), bad=visitsOf(d).filter(v=>validate(v).E.length);
+  const d=wd(), t=prT, bad=visitsOfT(d,t).filter(v=>validate(v).E.length);
   if(bad.length && !confirm('Hay atenciones con errores. ¿Generar el PDF de todas formas?')) return;
   const btn=$('#btnPdf'); btn.disabled=true; btn.textContent='Generando…'; $('#pdfShare').hidden=true;
   const host=document.createElement('div'); host.style.cssText='position:fixed;left:-30000px;top:0;background:#fff';
   document.body.appendChild(host);
   try{
     const {jsPDF}=window.jspdf; const doc=new jsPDF({unit:'mm',format:'a4',orientation:'portrait'});
-    const pages=buildPages(d);
+    const pages=buildPages(d,t);
     for(let i=0;i<pages.length;i++){
       const pg=pages[i]; pg.querySelector('.pl')?.remove(); pg.style.setProperty('--u','1px'); host.appendChild(pg);
       const cv=await html2canvas(pg,{scale:1.6,backgroundColor:'#ffffff',logging:false});
@@ -1265,9 +1367,9 @@ $('#btnPdf').onclick=async()=>{
       doc.addImage(cv.toDataURL('image/jpeg',0.92),'JPEG',(210-w)/2,5,w,h);
       host.removeChild(pg); cv.width=cv.height=0;
     }
-    const name='HIS-'+d+'.pdf';
+    const name='HIS-'+d+(t?'-'+TN[t].toLowerCase():'')+'.pdf';
     lastPdf=new File([doc.output('blob')],name,{type:'application/pdf'});
-    markPrinted(d);
+    if(t) markPrinted(d,t);
     const iOS=/iPhone|iPad|iPod/i.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
     const android=/Android/i.test(navigator.userAgent);
     if(iOS && await sharePdf()) {}           // iPhone/iPad: menú compartir (AirPrint, WhatsApp, Archivos)
@@ -1288,41 +1390,43 @@ function renderProd(d){
   const cnt={}; vs.forEach(v=>v.items.forEach(i=>{cnt[i.code]=cnt[i.code]||{desc:i.desc,n:0};cnt[i.code].n++}));
   const pats=new Set(vs.map(v=>v.patientId)).size;
   const nServ=vs.filter(v=>cond(v,'S')!=='C').length;
-  $('#prod').innerHTML='<p><b>'+vs.length+'</b> atenciones · <b>'+pats+'</b> pacientes distintos · <b>'+nServ+'</b> atendidos en el año (N + R en servicio)</p><table class="list"><tr><th>Código</th><th>Descripción</th><th>Cant.</th></tr>'+Object.entries(cnt).sort((a,b)=>b[1].n-a[1].n).map(([c,o])=>'<tr><td>'+esc(c)+'</td><td>'+esc(o.desc)+'</td><td>'+o.n+'</td></tr>').join('')+'</table>';
+  $('#prod').innerHTML='<p><b>'+vs.length+'</b> atenciones · <b>'+pats+'</b> pacientes distintos · <b>'+nServ+'</b> atendidos nuevos del año (N o R en servicio)</p><table class="list"><tr><th>Código</th><th>Descripción</th><th>Cant.</th></tr>'+Object.entries(cnt).sort((a,b)=>b[1].n-a[1].n).map(([c,o])=>'<tr><td>'+esc(c)+'</td><td>'+esc(o.desc)+'</td><td>'+o.n+'</td></tr>').join('')+'</table>';
 }
 
 /* ---------- Ajustes ---------- */
 function renderSettings(){
   const s=S.settings; $('#s_eess').value=s.eess;$('#s_upss').value=s.upss;$('#s_resp').value=s.resp;$('#s_dni').value=s.dni;
   $('#s_fin').innerHTML=finOpts(s.fin);$('#s_etnia').value=s.etnia;$('#s_dist').value=s.dist;$('#s_cp').value=s.cp;
+  const tc=tcfg(); $('#s_tm').value=tc.m; $('#s_tt').value=tc.t; $('#s_tn').value=tc.n; $('#s_tno').value=tc.noche?'1':''; $('#s_ta').value=tc.antes; $('#s_td').value=tc.despues;
   $('#bkInfo').textContent=S.lastBackup?'Última copia descargada: '+new Date(S.lastBackup).toLocaleString('es-PE'):'Todavía no has descargado ninguna copia.';
 }
 $('#btnSaveSet').onclick=()=>{
   const u=x=>$(x).value.trim().toUpperCase();
   Object.assign(S.settings,{eess:u('#s_eess'),upss:u('#s_upss'),resp:u('#s_resp'),dni:$('#s_dni').value.trim(),fin:+$('#s_fin').value,etnia:$('#s_etnia').value.trim(),dist:u('#s_dist'),cp:u('#s_cp')});
+  S.settings.turnos={m:$('#s_tm').value||'07:00',t:$('#s_tt').value||'13:00',n:$('#s_tn').value||'19:00',noche:!!$('#s_tno').value,antes:Math.max(0,+$('#s_ta').value||0),despues:Math.max(0,+$('#s_td').value||0)};
   save(); render(); $('#setMsg').textContent='Guardado.'; setTimeout(()=>$('#setMsg').textContent='',2000);
 };
 $('#btnExport').onclick=()=>doBackup();
 function doBackup(){
   S.lastBackup=Date.now(); S.bkSnooze=null; save();
   const a=document.createElement('a'); a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,1)],{type:'application/json'}));
-  a.download='his-odonto-copia-'+todayISO()+'.json'; document.body.appendChild(a); a.click(); a.remove(); renderSettings(); renderBackupBanner();
+  a.download='his-serums-copia-'+todayISO()+'.json'; document.body.appendChild(a); a.click(); a.remove(); renderSettings(); renderBackupBanner();
 }
 $('#fileImport').onchange=e=>{
   const f=e.target.files[0]; if(!f) return; const r=new FileReader();
   r.onload=()=>{ try{ const d=JSON.parse(r.result); if(!d.patients||!d.visits||!d.codes) throw 0;
     if(confirm('Esto reemplaza todos los datos actuales por los de la copia ('+d.patients.length+' pacientes, '+d.visits.length+' atenciones). ¿Continuar?')){ S=d; migrate(); save(); render(); } }
-    catch(_){ alert('El archivo no es una copia válida de HIS Odonto.'); } e.target.value=''; };
+    catch(_){ alert('El archivo no es una copia válida de HIS SERUMS.'); } e.target.value=''; };
   r.readAsText(f);
 };
-$('#btnWipe').onclick=()=>{ if(confirm('¿Borrar TODOS los pacientes, atenciones y ajustes? Descarga una copia antes.')&&confirm('Confirma de nuevo: esto no se puede deshacer.')){ try{localStorage.removeItem(KEY)}catch(e){} load(); render(); } };
+$('#btnWipe').onclick=()=>{ if(confirm('¿Borrar TODOS los pacientes, atenciones y ajustes? Descarga una copia antes.')&&confirm('Confirma de nuevo: esto no se puede deshacer.')){ try{localStorage.removeItem(KEY)}catch(e){} load(); render(); openServ(); } };
 
 /* ---------- utilidades comunes ---------- */
 const normQ=s=>String(s||'').toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim();
 const DIAS=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
 const dayName=iso=>DIAS[new Date(iso+'T12:00').getDay()];
 function grpOf(p,date){ const a=age(p&&p.fnac,date); if(!a) return null; return GRUPOS.find(g=>a.y>=g[2]&&a.y<=g[3])||null; }
-function goDay(d,view){ $('#workDate').value=d; $$('dialog[open]').forEach(x=>x.close()); setView(view||'atenciones'); }
+function goDay(d,view,t){ $('#workDate').value=d; if(t) prT=t; $$('dialog[open]').forEach(x=>x.close()); setView(view||'atenciones'); }
 const itemsTxt=v=>v.items.map(i=>'<div>'+esc(i.code)+' · '+esc(i.desc)+' <span class="muted">('+(i.tipo||'?')+')</span></div>').join('');
 
 /* ---------- Historial ---------- */
@@ -1359,7 +1463,7 @@ function renderHist(){
     if(v.date!==cur){ cur=v.date; const n=vs.filter(x=>x.date===cur).length;
       html+='<div class="dayh"><span class="grow">'+fmtD(cur)+' <span class="muted" style="font-weight:400">'+dayName(cur)+' · '+n+' atención(es)</span></span><button class="btn sm" data-gd="'+cur+'">Ir al día</button></div>'; }
     const p=pat(v.patientId)||{}, a=age(p.fnac,v.date), gg=grpOf(p,v.date);
-    html+='<div class="row2"><div class="grow"><b>'+esc(p.nom||'¿?')+'</b>'+(gg?'<span class="tag">'+gg[1]+'</span>':'')+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div><div class="codes muted">'+itemsTxt(v)+'</div></div><button class="btn sm" data-hv="'+v.id+'">Editar</button></div>';
+    html+='<div class="row2"><div class="grow"><b>'+esc(p.nom||'¿?')+'</b>'+(gg?'<span class="tag">'+gg[1]+'</span>':'')+'<div class="muted">DNI '+esc(p.dni||'—')+' · '+(a?a.n+' '+a.u:'')+' · '+TN[turnoOf(v)]+' · Est '+cond(v,'E')+' / Serv '+cond(v,'S')+'</div><div class="codes muted">'+itemsTxt(v)+'</div></div><button class="btn sm" data-hv="'+v.id+'">Editar</button></div>';
   });
   if(vs.length>MAX) html+='<p class="muted">Se muestran las '+MAX+' más recientes. Acota el rango de fechas para ver el resto.</p>';
   $('#hList').innerHTML=html;
@@ -1432,40 +1536,59 @@ $('#dtDelete').onclick=()=>{ if(confirm('¿Eliminar este control?')){ S.controls
 
 /* ---------- HIS entregados ---------- */
 let entTab='pend';
-const daySig=d=>visitsOf(d).map(v=>v.id+':'+(v.updated||v.created)).join('|');
-function hisState(d){ const h=S.his[d]||{}; return {printed:h.printed,delivered:h.delivered,changed:!!h.printed&&h.sig!==daySig(d)}; }
-function markPrinted(d){ S.his[d]={...(S.his[d]||{}),printed:todayISO(),sig:daySig(d)}; save(); renderBadges(); renderPrStatus(d); }
-function setDelivered(d,on){
-  const h=hisState(d);
+const hk=(d,t)=>d+'|'+t;
+const daySig=(d,t)=>visitsOfT(d,t).map(v=>v.id+':'+(v.updated||v.created)).join('|');
+function hisState(d,t){ const h=S.his[hk(d,t)]||{}; return {printed:h.printed,delivered:h.delivered,changed:!!h.printed&&h.sig!==null&&h.sig!==daySig(d,t)}; }
+function markPrinted(d,t){ S.his[hk(d,t)]={...(S.his[hk(d,t)]||{}),printed:todayISO(),sig:daySig(d,t)}; save(); renderBadges(); renderPrStatus(d,t); renderEnt(); }
+function setDelivered(d,t,on){
+  const h=hisState(d,t);
   if(on && (!h.printed||h.changed) && !confirm(h.printed?'Hubo cambios después de imprimir este HIS. ¿Marcarlo como entregado igual?':'Todavía no descargaste ni imprimiste este HIS. ¿Marcarlo como entregado igual?')) return;
-  S.his[d]={...(S.his[d]||{}),delivered:on?todayISO():null}; save(); render();
+  S.his[hk(d,t)]={...(S.his[hk(d,t)]||{}),delivered:on?todayISO():null}; save(); render();
 }
-function stTags(d){ const h=hisState(d);
+function stTags(d,t){ const h=hisState(d,t);
   return (h.delivered?'<span class="tag">entregado '+fmtD(h.delivered)+'</span>':'')+
     (h.printed?'<span class="tag g">impreso '+fmtD(h.printed)+'</span>':'<span class="tag e">sin imprimir</span>')+
     (h.changed?'<span class="tag w">cambió después de imprimir</span>':''); }
 $$('#eTabs [data-et]').forEach(b=>b.onclick=()=>{ entTab=b.dataset.et; $$('#eTabs [data-et]').forEach(x=>x.setAttribute('aria-pressed',x===b)); renderEnt(); });
 const workDays=()=>[...new Set(S.visits.map(v=>v.date))].sort().reverse();
+const workShifts=()=>workDays().flatMap(d=>turnosOf(d).map(t=>({d,t})));
 function renderEnt(){
   if(!$('#v-entregas').classList.contains('on')) return;
-  const days=workDays().filter(d=>entTab==='todo'||!hisState(d).delivered);
-  if(!days.length){ $('#eList').innerHTML='<div class="empty">'+(entTab==='pend'?'No hay HIS pendientes de entregar.':'Aún no hay atenciones registradas.')+'</div>'; return; }
-  $('#eList').innerHTML=days.map(d=>{ const h=hisState(d), n=visitsOf(d).length, rows=rowsFor(d).length;
-    return '<div class="row2'+(h.delivered?'':' clickable')+'" data-eg="'+(h.delivered?'':d)+'"><div class="grow"><b>'+fmtD(d)+'</b> <span class="muted">'+dayName(d)+'</span><div class="muted">'+n+' atención(es) · '+rows+' fila(s) · '+Math.max(1,Math.ceil(rows/25))+' juego(s)</div><div>'+stTags(d)+'</div></div>'+
-      '<div style="display:flex;flex-direction:column;gap:4px"><button class="btn sm" data-ev="'+d+'">Ver HIS</button>'+(h.delivered?'<button class="btn sm" data-eu="'+d+'">Deshacer entrega</button>':'<button class="btn sm pri" data-ed="'+d+'">Marcar entregado</button>')+'</div></div>';
+  const list=workShifts().filter(x=>entTab==='todo'||!hisState(x.d,x.t).delivered);
+  if(!list.length){ $('#eList').innerHTML='<div class="empty">'+(entTab==='pend'?'No hay HIS pendientes de entregar.':'Aún no hay atenciones registradas.')+'</div>'; return; }
+  $('#eList').innerHTML=list.map(({d,t})=>{ const h=hisState(d,t), n=visitsOfT(d,t).length, rows=rowsFor(d,t).length;
+    return '<div class="row2'+(h.delivered?'':' clickable')+'" data-eg="'+(h.delivered?'':d+'|'+t)+'"><div class="grow"><b>'+fmtD(d)+' · '+TN[t]+'</b> <span class="muted">'+dayName(d)+'</span><div class="muted">'+n+' atención(es) · '+rows+' fila(s) · '+Math.max(1,Math.ceil(rows/25))+' juego(s)</div><div>'+stTags(d,t)+'</div></div>'+
+      '<div style="display:flex;flex-direction:column;gap:4px"><button class="btn sm" data-ev="'+d+'|'+t+'">Ver HIS</button>'+(h.delivered?'<button class="btn sm" data-eu="'+d+'|'+t+'">Deshacer entrega</button>':'<button class="btn sm pri" data-ed="'+d+'|'+t+'">Marcar entregado</button>')+'</div></div>';
   }).join('');
-  $$('#eList [data-eg]').forEach(r=>r.onclick=e=>{ if(e.target.closest('button')||!r.dataset.eg) return; goDay(r.dataset.eg,'imprimir'); });
-  $$('#eList [data-ev]').forEach(b=>b.onclick=()=>goDay(b.dataset.ev,'imprimir'));
-  $$('#eList [data-ed]').forEach(b=>b.onclick=()=>setDelivered(b.dataset.ed,true));
-  $$('#eList [data-eu]').forEach(b=>b.onclick=()=>setDelivered(b.dataset.eu,false));
+  const sp=x=>x.split('|');
+  $$('#eList [data-eg]').forEach(r=>r.onclick=e=>{ if(e.target.closest('button')||!r.dataset.eg) return; const [d,t]=sp(r.dataset.eg); goDay(d,'imprimir',t); });
+  $$('#eList [data-ev]').forEach(b=>b.onclick=()=>{ const [d,t]=sp(b.dataset.ev); goDay(d,'imprimir',t); });
+  $$('#eList [data-ed]').forEach(b=>b.onclick=()=>{ const [d,t]=sp(b.dataset.ed); setDelivered(d,t,true); });
+  $$('#eList [data-eu]').forEach(b=>b.onclick=()=>{ const [d,t]=sp(b.dataset.eu); setDelivered(d,t,false); });
 }
-function renderPrStatus(d){
+function renderPrStatus(d,t){
   const box=$('#prStatus'); if(!box) return;
-  if(!visitsOf(d).length){ box.innerHTML=''; return; }
-  const h=hisState(d);
-  box.innerHTML='<div class="bar">'+stTags(d)+'<span class="grow"></span>'+(h.delivered?'<button class="btn sm" id="prUndo">Deshacer entrega</button>':'<button class="btn sm pri" id="prDel">Marcar entregado</button>')+'</div>';
-  if(h.delivered) $('#prUndo').onclick=()=>setDelivered(d,false); else $('#prDel').onclick=()=>setDelivered(d,true);
+  if(!t||!visitsOfT(d,t).length){ box.innerHTML=''; return; }
+  const h=hisState(d,t);
+  box.innerHTML='<div class="bar">'+stTags(d,t)+'<span class="grow"></span>'+(h.delivered?'<button class="btn sm" id="prUndo">Deshacer entrega</button>':'<button class="btn sm pri" id="prDel">Marcar entregado</button>')+'</div>';
+  if(h.delivered) $('#prUndo').onclick=()=>setDelivered(d,t,false); else $('#prDel').onclick=()=>setDelivered(d,t,true);
 }
+
+/* ---------- Revisión de turnos al entrar a Imprimir ---------- */
+const daySigAll=d=>visitsOf(d).map(v=>v.id+':'+turnoOf(v)+':'+(v.updated||v.created)).join('|');
+let revD=null;
+function reviewTurnos(d){
+  const ts=turnosOf(d), sus=sospechas(d);
+  if(ts.length<2 && !sus.length) return;
+  if(S.turnoOk[d]===daySigAll(d)) return;
+  revD=d;
+  $('#dtuBody').innerHTML='<p style="margin-top:0">El '+fmtD(d)+' tiene '+ts.map(t=>'<b>'+visitsOfT(d,t).length+' atención(es) de '+TN[t].toLowerCase()+'</b>').join(' y ')+'.'+(ts.length>1?' Se imprimirá un HIS por cada turno.':'')+'</p>'+
+    (sus.length?'<h3>Revisa estas atenciones</h3>'+sus.map(x=>{const p=pat(x.v.patientId)||{};return '<div class="row2"><div class="grow"><b>'+esc(p.nom||'¿?')+'</b> <span class="tag w">'+TN[turnoOf(x.v)]+'</span><div class="muted">'+esc(x.razon)+'</div></div><button class="btn sm" data-fix="'+x.v.id+'">Corregir</button></div>';}).join(''):'')+
+    '<h3>Por turno</h3>'+ts.map(t=>'<div class="muted" style="margin-bottom:6px"><b style="color:var(--ink)">'+TN[t]+':</b> '+visitsOfT(d,t).map(v=>esc((pat(v.patientId)||{}).nom||'¿?')+(v.created>1e12?' ('+hhmm(v.created)+')':'')).join(', ')+'</div>').join('');
+  $$('#dtuBody [data-fix]').forEach(b=>b.onclick=()=>{ $('#dlgTurno').close(); openVisit(b.dataset.fix); });
+  $('#dlgTurno').showModal();
+}
+$('#dtuOk').onclick=()=>{ S.turnoOk[revD]=daySigAll(revD); save(); $('#dlgTurno').close(); render(); };
 
 /* ---------- Paquetes ---------- */
 function renderPacks(){
@@ -1517,7 +1640,7 @@ $('#dkDelete').onclick=()=>{ if(confirm('¿Eliminar el paquete “'+K.name+'”?
 /* ---------- Avisos: badges y copia de seguridad ---------- */
 function renderBadges(){
   const nC=activeCtls().length, t=todayISO();
-  const nH=workDays().filter(d=>d<t&&!hisState(d).delivered).length;
+  const nH=workShifts().filter(x=>x.d<t&&!hisState(x.d,x.t).delivered).length;
   $('#bdgCtl').hidden=!nC; $('#bdgCtl').textContent=nC;
   $('#bdgHis').hidden=!nH; $('#bdgHis').textContent=nH;
 }
@@ -1530,13 +1653,36 @@ function renderBackupBanner(){
   if(need){ $('#bkNow').onclick=()=>doBackup(); $('#bkLater').onclick=()=>{ S.bkSnooze=t; save(); renderBackupBanner(); }; }
 }
 
+/* ---------- Servicio en el primer uso ---------- */
+let svSel=null;
+function openServ(){
+  svSel=null; $('#svOtro').value=''; $('#svMsgs').innerHTML='';
+  const draw=()=>{
+    $('#svOpts').innerHTML=SERVICIOS.concat(['OTRO']).map(x=>'<button class="chip" data-sv="'+x+'" aria-pressed="'+(svSel===x)+'">'+(x==='OTRO'?'Otro':x.charAt(0)+x.slice(1).toLowerCase())+'</button>').join('');
+    $('#svOtroWrap').hidden=svSel!=='OTRO';
+    $('#svNota').textContent=!svSel?'':svSel==='ODONTOLOGÍA'?'Se cargarán códigos, paquetes y un control de ejemplo de odontología para que los revises.':'Los códigos empiezan en blanco: agrégalos en “Códigos y reglas”.';
+    $$('#svOpts [data-sv]').forEach(b=>b.onclick=()=>{svSel=b.dataset.sv;draw();});
+  };
+  draw(); $('#dlgServ').showModal();
+}
+$('#dlgServ').addEventListener('cancel',e=>e.preventDefault());
+$('#svOk').onclick=()=>{
+  let sv=svSel==='OTRO'?$('#svOtro').value.trim().toUpperCase():svSel;
+  if(!sv){ $('#svMsgs').innerHTML='<div class="msg e">'+(svSel==='OTRO'?'Escribe el nombre del servicio.':'Elige un servicio.')+'</div>'; return; }
+  S.settings.servicio=sv; S.settings.upss=sv; delete S.nuevo;
+  if(esOdonto()){ S.codes=JSON.parse(JSON.stringify(SEED_CODES)); S.packs=JSON.parse(JSON.stringify(SEED_PACKS)); }
+  else { S.codes=[]; S.packs=[]; }
+  save(); $('#dlgServ').close(); render();
+};
+
 /* ---------- inicio ---------- */
 load();
 $('#workDate').value=todayISO();
-$('#workDate').onchange=render; $('#workTurno').onchange=render;
+$('#workDate').onchange=render;
 $('#attFilter').oninput=renderAtt;
 window.addEventListener('resize',()=>{ if($('#v-imprimir').classList.contains('on')) renderPrint(); });
 render();
+if(!S.settings.servicio) openServ();
 if('serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(()=>{});
 try{ navigator.storage && navigator.storage.persist && navigator.storage.persist(); }catch(e){}
 </script>
